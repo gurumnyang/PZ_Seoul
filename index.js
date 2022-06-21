@@ -1,11 +1,9 @@
 const fs = require('fs');
 const through = require('through2');
 const parseOSM = require('osm-pbf-parser');
-const PImage = require('pureimage');
 const canvas = require('canvas');
 const os = require('os');
 let cluster = require('cluster');
-const process = require('process');
 const arraySort = require('array-sort');
 const progress = require('cli-progress');
 const readline = require("readline");
@@ -33,6 +31,10 @@ const readline = require("readline");
 // 기본 잔디와, 약간의 나무     | 0 128 0
 // 밝고 긴 잔디               | 0 255 0
 // 없음 (black)              | 0 0 0
+
+
+let src = './highways1_01.pbf';
+// 'C:\\Users\\GurumNyang\\Downloads\\네이버 웨일 다운로드\\exe\\highways1_01.pbf'
 
 let lat = [37.6875428, 37.4307532, 111], // 위도 95.012152셀
     lon = [126.7684945, 127.2037614, 88.74] //경도 128.048753셀
@@ -77,14 +79,10 @@ class Init{
     readFile(){
         return new Promise(resolve => {
             console.log('불러오는 중');
-            fs.createReadStream('C:\\Users\\GurumNyang\\Downloads\\네이버 웨일 다운로드\\exe\\highways1_01.pbf')
+            fs.createReadStream(src)
                 .pipe(osm)
                 .pipe(through.obj(function (items, enc, next) {
                     items.forEach(function (item) {
-                        if(item.type !=='way'&&item.type !=='node'){
-                            console.log(item);
-                        }
-
                         if(item.type == 'way'){
                             ways.push(item);
                         }
@@ -117,6 +115,10 @@ class Init{
                         nodes = JSON.parse(fs.readFileSync('./nodes.json'));
                         resolve();
                     } else if (line == 'n' || line == 'N') {
+
+                        /**
+                         * @todo 클러스터링을 사용하여 처리속도를 올리도록 알고리즘 개선.
+                         */
                         console.log('처리 중 (1차)');
                         let roads = JSON.parse(fs.readFileSync('./new_openAPI_seoul_road.json'));
                         this.bar1 = new progress.SingleBar({}, progress.Presets.shades_classic);
@@ -283,9 +285,24 @@ class Init{
         ctx.lineWidth = 2;
         ctx.globalAlpha = 1;
 
+
+        /**
+         * @todo lineWidth Object .roadDATA USE
+         */
+        let widthData = [
+            {
+                name:'4이상8미만',
+                width:6
+            }
+        ]
         for(let route of cellWays){
             ctx.beginPath();
             for(let pointIdx in route.refs){
+
+                if(route.roadData){
+                    console.log(route.roadData);
+                    // ctx.lineWidth = 뭐시기
+                }
                 if(pointIdx == 0) {
                     ctx.moveTo(toMeter('lon', route.refs[pointIdx].lon - lon[0]) - (300*x), toMeter('lat', lat[0]-route.refs[pointIdx].lat) - (300*y));
                 }
@@ -295,256 +312,6 @@ class Init{
             }
             ctx.stroke();
         }
-
-
-
-        /*let cellWays = [];
-        let cellObj = cell[y][x];
-        for(let obj in cellObj){
-            obj = cellObj[obj];
-             for(let wObj in ways){
-                 wObj = ways[wObj];
-                 if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-             }
-        }
-        cellObj = cell[y][x+1];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y][x-1];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y+1][x+1];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y+1][x];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y+1][x-1];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y-1][x+1];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y-1][x];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-        cellObj = cell[y-1][x-1];
-        for(let obj of cellObj){
-            for(let wObj in ways){
-                wObj = ways[wObj];
-                if(wObj.refs.includes(obj.id)) cellWays.push(wObj);
-            }
-        }
-
-
-
-        let route = [];
-
-        let notFound = [];
-        for(let obj in cellWays){
-            obj = cellWays[obj];
-            for(let rObj in obj.refs){
-                var index1 = rObj;
-                rObj = obj.refs[rObj];
-                if(typeof(rObj) !== 'number') continue
-                let done = false;
-
-                if(cell[y]){
-                    for(let a of cell[y][x]){
-                        if(a.id == rObj){
-                            obj.refs[index1] = {
-                                lat: a.lat,
-                                lon: a.lon
-                            }
-                            done = true;
-                            continue;
-                        }
-                    }
-                    if(done) continue;
-                    if(cell[y][x-1]){
-                        for(let a of cell[y][x-1]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                    if(cell[y][x+1]){
-                        for(let a of cell[y][x+1]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                }
-                if(cell[y+1]){
-                    if(cell[y+1][x-1]){
-                        for(let a of cell[y+1][x-1]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                    if(cell[y+1][x]){
-                        for(let a of cell[y+1][x]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                    if(cell[y+1][x+1]){
-                        for(let a of cell[y+1][x+1]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                }
-                if(cell[y-1]){
-                    if(cell[y-1][x-1]){
-                        for(let a of cell[y-1][x-1]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                    if(cell[y-1][x]){
-                        for(let a of cell[y-1][x]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                    if(cell[y-1][x+1]){
-                        for(let a of cell[y-1][x+1]){
-                            if(a.id == rObj){
-                                obj.refs[index1] = {
-                                    lat: a.lat,
-                                    lon: a.lon
-                                }
-                                done = true;
-                                continue;
-                            }
-                        }
-                    }
-                    if(done) continue;
-                }
-                for(let a of nodes){
-                    if(a.id == rObj){
-                        obj.refs[index1] = {
-                            lat: a.lat,
-                            lon: a.lon
-                        }
-                        done = true;
-                        continue;
-                    }
-                }
-                if(!done) {
-                    obj.refs[index1] = null;
-                    notFound.push({
-                        id: rObj,
-                        obj: obj
-                    })
-                };
-            }
-            let routeObj = [];
-            for(let refs in obj.refs){
-                if(typeof(obj.refs[refs])=='object' && obj.refs[refs] !== null) {
-                    try {
-                        let meterCoord = {
-                            x: toMeter('lon', obj.refs[refs].lon - lon[0]) - (300*x),
-                            y: toMeter('lat', lat[0]-obj.refs[refs].lat) - (300*y)
-                        }
-                        routeObj.push(meterCoord);
-                    } catch (e) {
-                        console.log('올바르지 못한 값이 들어옴');
-                        console.log(e);
-                    }
-                };
-            }
-            if(routeObj.length >= 2) route.push(routeObj);
-        }
-        for(let routeIdx in route){
-            ctx.beginPath();
-            for(let pointIdx in route[routeIdx]){
-                if(pointIdx == 0) {
-                    ctx.moveTo(route[routeIdx][pointIdx].x, route[routeIdx][pointIdx].y);
-                }
-                else {
-                    ctx.lineTo(route[routeIdx][pointIdx].x, route[routeIdx][pointIdx].y);
-                }
-            }
-            ctx.stroke();
-        }*/
 
 
 
@@ -668,4 +435,4 @@ if (cluster.isMaster) {
     //         })
     //     }
     // })
-}
+}hg
