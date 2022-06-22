@@ -83,11 +83,11 @@ class Init{
                 .pipe(osm)
                 .pipe(through.obj(function (items, enc, next) {
                     items.forEach(function (item) {
-                        if(item.type == 'way'){
+                        if(item.type === 'way'){
                             ways.push(item);
                         }
                         if(item.lat&&item.lon){
-                            if(item.type == 'node'){
+                            if(item.type === 'node'){
                                 nodes.push(item);
                             }
                         }
@@ -110,11 +110,11 @@ class Init{
                 });
                 rl.on("line", function (line) {
                     rl.close();
-                    if (line == 'y' || line == 'Y') {
+                    if (line === 'y' || line === 'Y') {
                         ways = JSON.parse(fs.readFileSync('./ways.json'));
                         nodes = JSON.parse(fs.readFileSync('./nodes.json'));
                         resolve();
-                    } else if (line == 'n' || line == 'N') {
+                    } else if (line === 'n' || line === 'N') {
 
                         /**
                          * @todo 클러스터링을 사용하여 처리속도를 올리도록 알고리즘 개선.
