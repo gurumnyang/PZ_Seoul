@@ -20,39 +20,47 @@ let ways = [];
 if (cluster.isMaster) {
 
     let workers = [];
+    let stableWorker = 0;
 
     console.log(`Primary ${process.pid} is running`);
-
-    // Fork workers.
-    for (let i = 0; i < os.cpus().length; i++) {
-        var worker = cluster.fork();
-        let workerId = i;
-        workers.push({
-            index: i,
-            worker: worker,
-            status: -1
-        });
-        worker.on('message', (e)=>
-            {
-                switch(e.header){
-                    case 'ready':
-                    {
-                        workers[i].status = 0;
-                        workers[i].pid = e.data.id;
-                        console.log(`Worker ${workerId} is ready. pid: ${e.data.id}`);
-                        break;
+    osmProcess = new osmProcess(config.lat, config.lon, true).then(()=>{
+        console.log(os.cpus());
+        // Fork workers.
+        for (let i = 0; i < os.cpus().length; i++) {
+            var worker = cluster.fork();
+            let workerId = i;
+            workers.push({
+                index: i,
+                worker: worker,
+                status: -1
+            });
+            worker.on('message', (e)=>
+                {
+                    switch(e.header){
+                        case 'ready':
+                        {
+                            workers[i].status = 0;
+                            workers[i].pid = e.data.id;
+                            console.log(`Worker ${workerId} is ready. pid: ${e.data.id}`);
+                            stableWorker++;
+                            if(stableWorker == os.cpus().length) console.log('준비 완료');
+                            break;
+                        }
                     }
+                    // console.log(e);
                 }
-                // console.log(e);
-            }
-        );
-    }
+            );
+        }
+
+    });
+
 
     cluster.on('exit', (worker, code, signal) => {
         console.log(`worker ${worker.process.pid} died`);
     });
 } else {
     process.send({header:'ready', data:{id:process.pid}});
+
     process.on('message', (e)=> {
         switch (e.header) {
             case 'waysCoord':

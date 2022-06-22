@@ -8,7 +8,7 @@ const arraySort = require('array-sort');
 const progress = require('cli-progress');
 const readline = require("readline");
 
-
+let config = JSON.parse(fs.readFileSync("./config.json"));
 
 // 위도 37.6875428, 37.4307532 111km
 // 경도 126.7684945, 127.2037614
@@ -33,11 +33,10 @@ const readline = require("readline");
 // 없음 (black)              | 0 0 0
 
 
-let src = './highways1_01.pbf';
 // 'C:\\Users\\GurumNyang\\Downloads\\네이버 웨일 다운로드\\exe\\highways1_01.pbf'
 
-let lat = [37.6875428, 37.4307532, 111], // 위도 95.012152셀
-    lon = [126.7684945, 127.2037614, 88.74] //경도 128.048753셀
+let lat = config.lat, // 위도 95.012152셀
+    lon = config.lon //경도 128.048753셀
 
 let renderCell = [30, 30]
 
@@ -45,21 +44,32 @@ let cell = [];
 let nodes = [];
 let ways = [];
 
+/**
+ * @todo clustering must be finished!!
+ */
+
 class Init{
-    constructor(lat, lon) {
+    constructor(lat, lon, isMaster) {
+
         this.latCell = toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
-        this.osm = parseOSM();
-        this.cellInit(this.latCell, this.lonCell);
-        console.log('위도 ',this.latCell,'셀, ', cell.length,'lat');
-        console.log('경도 ',this.lonCell,'셀  ', cell[0].length,'lon');
-        this.readFile()
-            .then(()=>this.waysCoord())
-            .then(()=>this.nodeToCell())
-            .then(async ()=>{
-            });
-
-    }
+        return new Promise(resolve=>{
+            if(isMaster){
+                this.osm = parseOSM();
+                this.cellInit(this.latCell, this.lonCell);
+                console.log('위도 ',this.latCell,'셀, ', cell.length,'lat');
+                console.log('경도 ',this.lonCell,'셀  ', cell[0].length,'lon');
+                this.readFile().then(()=>{
+                    resolve();
+                })
+                //     .then(()=>this.waysCoord())
+                //     .then(()=>this.nodeToCell())
+                //     .then(async ()=>{
+                //     });
+        
+            }    
+        })
+}
     cellInit(latCell, lonCell){
         for(let lat=0;lat<Math.floor(latCell);lat++){
             cell[lat] = [];
@@ -71,7 +81,7 @@ class Init{
     readFile(){
         return new Promise(resolve => {
             console.log('불러오는 중');
-            fs.createReadStream(src)
+            fs.createReadStream(config.fileSrc)
                 .pipe(this.osm)
                 .pipe(through.obj(function (items, enc, next) {
                     items.forEach(function (item) {
@@ -92,7 +102,7 @@ class Init{
             });
         })
     }
-    waysCoord(){
+    waysCoord(isMaster){
         return new Promise(resolve=>{
             if (fs.existsSync('./nodes.json') && fs.existsSync('./ways.json')) {
                 console.log('저장된 처리 파일 발견됨. 해당 파일을 이용하시겠습니까? 새로운 맵 파일의 경우 N을 권장합니다. (Y/N)');
