@@ -2,8 +2,6 @@ const fs = require('fs');
 const through = require('through2');
 const parseOSM = require('osm-pbf-parser');
 const canvas = require('canvas');
-const os = require('os');
-let cluster = require('cluster');
 const arraySort = require('array-sort');
 const progress = require('cli-progress');
 const readline = require("readline");
@@ -41,17 +39,13 @@ let roadType = JSON.parse(fs.readFileSync('./roadType.json'));
 let lat = config.lat, // 위도 95.012152셀
     lon = config.lon //경도 128.048753셀
 
-let renderCell = [30, 30];
-
-let nodes = [];
-let ways = [];
 
 /**
  * @todo clustering must be finished!!
  */
 
 class Init{
-    constructor(lat, lon, isMaster) {
+    constructor(lat, lon) {
 
         this.cell = [];
         this.ways = [];
@@ -59,56 +53,65 @@ class Init{
 
         this.latCell = toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
-        return new Promise(resolve=>{
+
+    }
+    init(isMaster){
+        return new Promise(async resolve=>{
             if(isMaster){
                 this.osm = parseOSM();
-                this.cellInit(this.latCell, this.lonCell);
-                console.log('위도 ',this.latCell,'셀, ', cell.length,'lat');
-                console.log('경도 ',this.lonCell,'셀  ', cell[0].length,'lon');
-                this.readFile().then(()=>{
-                    resolve();
-                })
+                await this.cellInit(this.latCell, this.lonCell);
+                console.log('위도 ',this.latCell,'셀, ', this.cell.length,'lat');
+                console.log('경도 ',this.lonCell,'셀  ', this.cell[0].length,'lon');
+                await this.readFile();
+                resolve();
                 //     .then(()=>this.waysCoord())
                 //     .then(()=>this.nodeToCell())
                 //     .then(async ()=>{
                 //     });
-        
-            }    
-        })
-}
-    cellInit(latCell, lonCell){
-        for(let lat=0;lat<Math.floor(latCell);lat++){
-            (this.cell)[lat] = [];
-            for(let lon=0;lon<Math.floor(lonCell);lon++){
-                (this.cell)[lat][lon] = [];
+
             }
-        }
+            resolve();
+        })
+    }
+    cellInit(latCell, lonCell){
+        return new Promise(resolve=>{
+            for (let lat = 0; lat < Math.floor(latCell); lat++) {
+                (this.cell)[lat] = [];
+                for (let lon = 0; lon < Math.floor(lonCell); lon++) {
+                    (this.cell)[lat][lon] = [];
+                }
+            }
+            resolve();
+        })
     }
     readFile(){
         return new Promise(resolve => {
             console.log('불러오는 중');
             fs.createReadStream(config.fileSrc)
                 .pipe(this.osm)
-                .pipe(through.obj(function (items, enc, next) {
-                    items.forEach(function (item) {
-                        if(item.type == 'way'){
+                .pipe(through.obj((items, enc, next)=> {
+                    items.forEach((item)=> {
+                        if(item.type === 'way'){
                             this.ways.push(item);
                         }
                         if(item.lat&&item.lon){
-                            if(item.type == 'node'){
+                            if(item.type === 'node'){
                                 this.nodes.push(item);
                             }
                         }
                     });
                     next();
                 })).on('finish', ()=>{
-                ways = arraySort(this.ways, 'id');
-                nodes = arraySort(this.nodes, 'id');
-                resolve();
-            });
-        })
+                    this.ways = arraySort(this.ways, 'id');
+                    this.nodes = arraySort(this.nodes, 'id');
+                    resolve();
+                });
+        });
     }
-    waysCoord(isMaster, cell){
+    waysCoord(isMaster, workerNumber, length){
+        /**
+         * @todo workerNumber이랑 length를 기반으로 range 만들어야 함
+         */
         return new Promise(resolve=>{
             if (fs.existsSync('./nodes.json') && fs.existsSync('./ways.json')) {
                 console.log('저장된 처리 파일 발견됨. 해당 파일을 이용하시겠습니까? 새로운 맵 파일의 경우 N을 권장합니다. (Y/N)');
@@ -116,101 +119,98 @@ class Init{
                     input: process.stdin,
                     output: process.stdout,
                 });
-                rl.on("line", function (line) {
+                rl.on("line", (line) => {
                     rl.close();
-                    if (line == 'y' || line == 'Y') {
-                        ways = JSON.parse(fs.readFileSync('./ways.json'));
-                        nodes = JSON.parse(fs.readFileSync('./nodes.json'));
+                    if (line === 'y' || line === 'Y') {
+                        this.ways = JSON.parse(fs.readFileSync('./ways.json').toString());
+                        this.nodes = JSON.parse(fs.readFileSync('./nodes.json').toString());
                         resolve();
-                    } else if (line == 'n' || line == 'N') {
-
-                        /**
-                         * @todo 클러스터링을 사용하여 처리속도를 올리도록 알고리즘 개선.
-                         */
+                    } else if (line === 'n' || line === 'N') {
                         console.log('처리 중 (1차)');
-                        let roads = JSON.parse(fs.readFileSync('./new_openAPI_seoul_road.json'));
+                        let roads = JSON.parse(fs.readFileSync('./new_openAPI_seoul_road.json').toString());
                         this.bar1 = new progress.SingleBar({}, progress.Presets.shades_classic);
-                        this.bar1.start(ways.length, 0);
-                        for(var wayIndex in ways){
-                            if(ways[wayIndex].tags.name){
-                                let roadFound = roadBindFind(ways[wayIndex].tags.name, roads.DATA);
+                        this.bar1.start(this.ways.length, 0);
+                        for(const wayIndex in this.ways){
+                            if(this.ways[wayIndex].tags.name){
+                                let roadFound = roadBindFind(this.ways[wayIndex].tags.name, roads.DATA);
                                 if(roadFound){
-                                    ways[wayIndex].roadData = roadFound;
+                                    this.ways[wayIndex].roadData = roadFound;
                                 } else {
-                                    ways[wayIndex].roadData = null;
-                                    console.log(ways[wayIndex].tags.name);
+                                    this.ways[wayIndex].roadData = null;
+                                    console.log(this.ways[wayIndex].tags.name);
                                 }
                             }
                             this.bar1.increment();
-                            for(var obj in ways[wayIndex].refs){
-                                //var found = nodes.find(e => e.id==ways[wayIndex].refs[obj]);
-                                var found = bindFind(ways[wayIndex].refs[obj], nodes);
+                            for(const obj in this.ways[wayIndex].refs){
+                                //var found = this.nodes.find(e => e.id==this.ways[wayIndex].refs[obj]);
+                                const found = bindFind(this.ways[wayIndex].refs[obj], this.nodes);
                                 if(found){
-                                    if(nodes[nodes.indexOf(found)].ways){
-                                        nodes[nodes.indexOf(found)].ways.push(ways[wayIndex].id);
+                                    if(this.nodes[this.nodes.indexOf(found)].ways){
+                                        this.nodes[this.nodes.indexOf(found)].ways.push(this.ways[wayIndex].id);
                                     } else {
-                                        nodes[nodes.indexOf(found)].ways = [ways[wayIndex].id];
+                                        this.nodes[this.nodes.indexOf(found)].ways = [this.ways[wayIndex].id];
                                     }
-                                    ways[wayIndex].refs[obj] = {
+                                    this.ways[wayIndex].refs[obj] = {
                                         id: found.id,
                                         lat: found.lat,
                                         lon: found.lon
                                     }
                                 } else {
                                     console.log('NULL');
-                                    ways[wayIndex].refs[obj] = null;
+                                    this.ways[wayIndex].refs[obj] = null;
                                 }
                             }
                         }
                         this.bar1.stop();
                         console.log('done');
-                        fs.writeFileSync('./nodes.json', JSON.stringify(nodes));
-                        fs.writeFileSync('./ways.json', JSON.stringify(ways));
+                        fs.writeFileSync('./nodes.json', JSON.stringify(this.nodes));
+                        fs.writeFileSync('./ways.json', JSON.stringify(this.ways));
                         this.bar1 = null;
                         resolve();
                     }
                 });
-            } else {
+            }
+            else {
                 console.log('처리 중 (1차)');
-                let roads = JSON.parse(fs.readFileSync('./new_openAPI_seoul_road.json'));
+                let roads = JSON.parse(fs.readFileSync(config.roadFileSrc));
                 this.bar1 = new progress.SingleBar({}, progress.Presets.shades_classic);
-                this.bar1.start(ways.length, 0);
-                for(var wayIndex in ways){
-                    if(ways[wayIndex].tags.name){
-                        let roadFound = roadBindFind(ways[wayIndex].tags.name, roads.DATA);
+                this.bar1.start(this.ways.length, 0);
+
+                for(const wayIndex in this.ways){
+                    console.log(this.ways);
+                    if(this.ways[wayIndex].tags.name){
+                        let roadFound = roadBindFind(this.ways[wayIndex].tags.name, roads.DATA);
                         if(roadFound){
-                            ways[wayIndex].roadData = roadFound;
+                            this.ways[wayIndex].roadData = roadFound;
                         } else {
-                            ways[wayIndex].roadData = null;
+                            this.ways[wayIndex].roadData = null;
                         }
                     }
 
-                    if(ways[wayIndex].tags.name)
+                    if(this.ways[wayIndex].tags.name)
                         this.bar1.increment();
-                    for(var obj in ways[wayIndex].refs){
-                        //var found = nodes.find(e => e.id==ways[wayIndex].refs[obj]);
-                        var found = bindFind(ways[wayIndex].refs[obj], nodes);
+                    for(const obj in this.ways[wayIndex].refs){
+                        //var found = this.nodes.find(e => e.id==this.ways[wayIndex].refs[obj]);
+                        const found = bindFind(this.ways[wayIndex].refs[obj], this.nodes);
                         if(found){
-                            if(nodes[nodes.indexOf(found)].ways){
-                                nodes[nodes.indexOf(found)].ways.push(ways[wayIndex].id);
+                            if(this.nodes[this.nodes.indexOf(found)].ways){
+                                this.nodes[this.nodes.indexOf(found)].ways.push(this.ways[wayIndex].id);
                             } else {
-                                nodes[nodes.indexOf(found)].ways = [ways[wayIndex].id];
+                                this.nodes[this.nodes.indexOf(found)].ways = [this.ways[wayIndex].id];
                             }
-                            ways[wayIndex].refs[obj] = {
+                            this.ways[wayIndex].refs[obj] = {
                                 id: found.id,
                                 lat: found.lat,
                                 lon: found.lon
                             }
                         } else {
                             console.log('NULL');
-                            ways[wayIndex].refs[obj] = null;
+                            this.ways[wayIndex].refs[obj] = null;
                         }
                     }
                 }
                 this.bar1.stop();
                 console.log('done');
-                fs.writeFileSync('./nodes.json', JSON.stringify(nodes));
-                fs.writeFileSync('./ways.json', JSON.stringify(ways));
                 this.bar1 = null;
                 resolve();
             }
@@ -221,8 +221,8 @@ class Init{
         return new Promise(resolve => {
             console.log('처리 중 (2차)');
             this.bar1 = new progress.SingleBar({}, progress.Presets.shades_classic);
-            this.bar1.start(nodes.length, 0);
-            for(let item of nodes){
+            this.bar1.start(this.nodes.length, 0);
+            for(let item of this.nodes){
                 this.bar1.increment();
                 (this.cell)[Math.floor(toMeter('lat', lat[0] - item.lat ) / 300)][Math.floor(toMeter('lon', item.lon - lon[0]) / 300)].push(item);
             }
@@ -237,12 +237,12 @@ class Init{
         // 0 1 2
         // 1 2 3
         // 2 3 4
-        if(x>=cell[0].length){
+        if(x>=this.cell[0].length){
             process.send('message', {status:3});
             console.log('NO CELL');
             return;
         }
-        if(y>=cell.length){
+        if(y>=this.cell.length){
             process.send('message', {status:4});
             console.log('NO CELL');
             process.exit();
@@ -274,12 +274,12 @@ class Init{
             [-1,0],
             [-1,1]
         ];
-        for(var i=0; i<9;i++){
-            var cellObj = cell[y+task[i][0]][x+task[i][1]];
+        for(let i=0; i<9; i++){
+            const cellObj = this.cell[y + task[i][0]][x + task[i][1]];
             for(let obj of cellObj){
                 if(!obj.ways) continue; //node중엔 경유지점이 없는 것도 있다.
                 for(let obj_1 of obj.ways){
-                    const found = bindFind(obj_1, ways);
+                    const found = bindFind(obj_1, this.ways);
                     if(found){
                         cellWays.push(found);
                     } else {
@@ -311,7 +311,7 @@ class Init{
                     console.log(route.roadData);
                     // ctx.lineWidth = 뭐시기
                 }
-                if(pointIdx == 0) {
+                if(pointIdx === 0) {
                     ctx.moveTo(toMeter('lon', route.refs[pointIdx].lon - lon[0]) - (300*x), toMeter('lat', lat[0]-route.refs[pointIdx].lat) - (300*y));
                 }
                 else {
@@ -355,22 +355,22 @@ function getDistance(lat, lon){
     return Math.sqrt(Math.abs(lat[0]-lat[1]) + Math.abs(lon[0]-lon[1]));
 }
 function toMeter(type, distance){
-    if(type == 'lat') return distance*lat[2]*1000;
-    if(type == 'lon') return distance*lon[2]*1000;
+    if(type === 'lat') return distance*lat[2]*1000;
+    if(type === 'lon') return distance*lon[2]*1000;
 }
 function toAngle(type, distance){
-    if(type == 'lat') return distance/lat[2]/1000;
-    if(type == 'lon') return distance/lon[2]/1000;
+    if(type === 'lat') return distance/lat[2]/1000;
+    if(type === 'lon') return distance/lon[2]/1000;
 
 }
 function bindFind(id, data){
-    var low = 0;
-    var high = data.length - 1;
-    var mid =  Math.floor((low + high)/2);
+    let low = 0;
+    let high = data.length - 1;
+    let mid = Math.floor((low + high) / 2);
     while(true){
         mid =  Math.floor((low + high)/2);
         if(low>high) return false;
-        if(data[mid].id == id){
+        if(data[mid].id === id){
             return data[mid];
         }
         if(data[mid].id < id){
@@ -381,16 +381,16 @@ function bindFind(id, data){
     }
 }
 function roadBindFind(id, data){
-    var low = 0;
-    var high = data.length - 1;
-    var mid =  Math.floor((low + high)/2);
+    let low = 0;
+    let high = data.length - 1;
+    let mid = Math.floor((low + high) / 2);
     while(true){
         mid =  Math.floor((low + high)/2);
         if(low>high) return false;
-        if(data[mid].rod_num == id){
+        if(data[mid].rod_num === id){
             return data[mid];
         }
-        if([id, data[mid].rod_num].sort()[0] == id){
+        if([id, data[mid].rod_num].sort()[0] === id){
             high = mid - 1;
         } else {
             low = mid + 1;

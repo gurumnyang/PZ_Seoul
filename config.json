@@ -2,5 +2,6 @@
   "lat" : [37.6875428, 37.4307532, 111],
   "lon" : [126.7684945, 127.2037614, 88.74],
   "fileSrc": "./highways1_01.pbf",
+  "roadFileSrc": "./new_openAPI_seoul_road.json",
   "generate": [50,50]
 }
