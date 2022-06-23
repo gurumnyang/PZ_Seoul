@@ -9,6 +9,9 @@ const progress = require('cli-progress');
 const readline = require("readline");
 
 let config = JSON.parse(fs.readFileSync("./config.json"));
+let roadType = JSON.parse(fs.readFileSync('./roadType.json'));
+
+// console.log(roadType["6m미만"]);
 
 // 위도 37.6875428, 37.4307532 111km
 // 경도 126.7684945, 127.2037614
@@ -38,9 +41,8 @@ let config = JSON.parse(fs.readFileSync("./config.json"));
 let lat = config.lat, // 위도 95.012152셀
     lon = config.lon //경도 128.048753셀
 
-let renderCell = [30, 30]
+let renderCell = [30, 30];
 
-let cell = [];
 let nodes = [];
 let ways = [];
 
@@ -50,6 +52,10 @@ let ways = [];
 
 class Init{
     constructor(lat, lon, isMaster) {
+
+        this.cell = [];
+        this.ways = [];
+        this.nodes = [];
 
         this.latCell = toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
@@ -72,9 +78,9 @@ class Init{
 }
     cellInit(latCell, lonCell){
         for(let lat=0;lat<Math.floor(latCell);lat++){
-            cell[lat] = [];
+            (this.cell)[lat] = [];
             for(let lon=0;lon<Math.floor(lonCell);lon++){
-                cell[lat][lon] = [];
+                (this.cell)[lat][lon] = [];
             }
         }
     }
@@ -86,23 +92,23 @@ class Init{
                 .pipe(through.obj(function (items, enc, next) {
                     items.forEach(function (item) {
                         if(item.type == 'way'){
-                            ways.push(item);
+                            this.ways.push(item);
                         }
                         if(item.lat&&item.lon){
                             if(item.type == 'node'){
-                                nodes.push(item);
+                                this.nodes.push(item);
                             }
                         }
                     });
                     next();
                 })).on('finish', ()=>{
-                ways = arraySort(ways, 'id');
-                nodes = arraySort(nodes, 'id');
+                ways = arraySort(this.ways, 'id');
+                nodes = arraySort(this.nodes, 'id');
                 resolve();
             });
         })
     }
-    waysCoord(isMaster){
+    waysCoord(isMaster, cell){
         return new Promise(resolve=>{
             if (fs.existsSync('./nodes.json') && fs.existsSync('./ways.json')) {
                 console.log('저장된 처리 파일 발견됨. 해당 파일을 이용하시겠습니까? 새로운 맵 파일의 경우 N을 권장합니다. (Y/N)');
@@ -218,7 +224,7 @@ class Init{
             this.bar1.start(nodes.length, 0);
             for(let item of nodes){
                 this.bar1.increment();
-                cell[Math.floor(toMeter('lat', lat[0] - item.lat ) / 300)][Math.floor(toMeter('lon', item.lon - lon[0]) / 300)].push(item);
+                (this.cell)[Math.floor(toMeter('lat', lat[0] - item.lat ) / 300)][Math.floor(toMeter('lon', item.lon - lon[0]) / 300)].push(item);
             }
 
             this.bar1.stop();

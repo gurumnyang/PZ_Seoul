@@ -24,7 +24,7 @@ if (cluster.isMaster) {
 
     console.log(`Primary ${process.pid} is running`);
     osmProcess = new osmProcess(config.lat, config.lon, true).then(()=>{
-        console.log(os.cpus());
+        console.log(os.cpus().length + '개의 CPU 코어 확인.');
         // Fork workers.
         for (let i = 0; i < os.cpus().length; i++) {
             var worker = cluster.fork();
@@ -43,7 +43,10 @@ if (cluster.isMaster) {
                             workers[i].pid = e.data.id;
                             console.log(`Worker ${workerId} is ready. pid: ${e.data.id}`);
                             stableWorker++;
-                            if(stableWorker == os.cpus().length) console.log('준비 완료');
+                            if(stableWorker == os.cpus().length) broadcast({
+                                header: 'waysCoord',
+                                data: osmProcess.ways //osm class 추가 편집 필요.
+                            }, workers);
                             break;
                         }
                     }
@@ -71,4 +74,10 @@ if (cluster.isMaster) {
             }
         }
     });
+}
+
+function broadcast(data, workers){
+    for(let worker of workers){
+        worker.send(data);
+    }
 }
