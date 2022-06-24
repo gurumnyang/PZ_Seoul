@@ -108,10 +108,20 @@ class Init{
                 });
         });
     }
-    waysCoord(isMaster, workerNumber, length){
+    waysCoord(isMaster, workerNumber, length, ways_callback, nodes_callback){
         /**
          * @todo workerNumber이랑 length를 기반으로 range 만들어야 함
          */
+        console.log(isMaster, workerNumber, length);
+
+        let n =(this.nodes.length - (this.nodes.length % length));
+
+        let range = [
+            (n*(workerNumber - 1)),
+            ((n*workerNumber)-1)
+        ];
+
+        console.log(`Worker ${workerNumber} started`);
         return new Promise(resolve=>{
             if (fs.existsSync('./nodes.json') && fs.existsSync('./ways.json')) {
                 console.log('저장된 처리 파일 발견됨. 해당 파일을 이용하시겠습니까? 새로운 맵 파일의 경우 N을 권장합니다. (Y/N)');
@@ -163,8 +173,6 @@ class Init{
                         }
                         this.bar1.stop();
                         console.log('done');
-                        fs.writeFileSync('./nodes.json', JSON.stringify(this.nodes));
-                        fs.writeFileSync('./ways.json', JSON.stringify(this.ways));
                         this.bar1 = null;
                         resolve();
                     }
@@ -176,28 +184,46 @@ class Init{
                 this.bar1 = new progress.SingleBar({}, progress.Presets.shades_classic);
                 this.bar1.start(this.ways.length, 0);
 
-                for(const wayIndex in this.ways){
-                    console.log(this.ways);
+                for(let wayIndex = range[0]; wayIndex < (range[1]+1);wayIndex++){
                     if(this.ways[wayIndex].tags.name){
                         let roadFound = roadBindFind(this.ways[wayIndex].tags.name, roads.DATA);
                         if(roadFound){
-                            this.ways[wayIndex].roadData = roadFound;
+                            ways_callback('set', {
+                                name:"roadData",
+                                index: wayIndex,
+                                value: roadFound
+                            });
                         } else {
-                            this.ways[wayIndex].roadData = null;
+                            ways_callback('set', {
+                                name:"roadData",
+                                index: wayIndex,
+                                value: null
+                            });
                         }
                     }
 
-                    if(this.ways[wayIndex].tags.name)
-                        this.bar1.increment();
+                    this.bar1.increment();
                     for(const obj in this.ways[wayIndex].refs){
                         //var found = this.nodes.find(e => e.id==this.ways[wayIndex].refs[obj]);
                         const found = bindFind(this.ways[wayIndex].refs[obj], this.nodes);
                         if(found){
                             if(this.nodes[this.nodes.indexOf(found)].ways){
-                                this.nodes[this.nodes.indexOf(found)].ways.push(this.ways[wayIndex].id);
-                            } else {
-                                this.nodes[this.nodes.indexOf(found)].ways = [this.ways[wayIndex].id];
+                                nodes_callback('push', {
+                                    name: 'ways',
+                                    index: this.nodes.indexOf(found),
+                                    value: this.ways[wayIndex].id
+                                });
+                                } else {
+                                nodes_callback('set', {
+                                    name: 'ways',
+                                    index: this.nodes.indexOf(found),
+                                    value: this.ways[wayIndex].id
+                                });
                             }
+                            ways_callback('set', {
+                                name: 'refs',
+                                index:wayIndex,
+                            })
                             this.ways[wayIndex].refs[obj] = {
                                 id: found.id,
                                 lat: found.lat,

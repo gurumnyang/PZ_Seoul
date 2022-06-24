@@ -37,14 +37,17 @@ if (cluster.isMaster) {
 
                             console.log(`Worker ${workerId} is ready. pid: ${e.data.id}`);
                             stableWorker++;
-                            if(stableWorker == os.cpus().length) broadcast({
-                                header: 'waysCoord',
-                                data: {
-                                    ways: osmProcess.ways,
-                                    nodes: osmProcess.nodes,
-                                    cell: osmProcess.cell
-                                }
-                            });
+                            if(stableWorker == os.cpus().length) {
+                                console.log('waysCoord Start');
+                                broadcast({
+                                    header: 'waysCoord',
+                                    data: {
+                                        ways: osmProcess.ways,
+                                        nodes: osmProcess.nodes,
+                                        cell: osmProcess.cell
+                                    }
+                                });
+                            }
                             break;
                         }
                     }
@@ -75,7 +78,54 @@ if (cluster.isMaster) {
                 osmProcess.ways = e.data.ways;
                 osmProcess.nodes = e.data.nodes;
                 osmProcess.cell = e.data.cell;
-                osmProcess.waysCoord(false, e.worker.id, e.length).then(()=>{
+                osmProcess.waysCoord(false, e.worker.id, e.length,
+                    (type, data)=>
+                    {
+                        /*data 형태
+                        data {
+                            index
+                            name(ex.roadData)
+                            value
+                        }*/
+                        switch(type){
+                            case 'push':
+                            {
+                                if(data.name){
+                                    ways[data.index][data.name].push(data.value);
+                                }
+                                break;
+                            }
+                            case 'set':
+                            {
+
+                                if(data.name){
+                                    ways[data.index][data.name] = (data.value);
+                                }
+                                break;
+                            }
+                        }
+                    },
+                    (type, data)=>
+                    {
+                        switch(type){
+                            case 'push':
+                            {
+                                if(data.name){
+                                    nodes[data.index][data.name].push(data.value);
+                                }
+                                break;
+                            }
+                            case 'set':
+                            {
+
+                                if(data.name){
+                                    nodes[data.index][data.name] = (data.value);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                ).then(()=>{
 
                 });
                 break;
@@ -89,7 +139,7 @@ function broadcast(data){
     if(cluster.isMaster){
         Object.values(cluster.workers).forEach((worker)=>{
             data.worker = worker;
-            data.length = cluster.workers.length;
+            data.length = Object.values(cluster.workers).length;
             worker.send(data);
         });
         // for(let i in cluster.workers){
