@@ -3,7 +3,7 @@ const through = require('through2');
 const parseOSM = require('osm-pbf-parser');
 const canvas = require('canvas');
 const os = require('os');
-let cluster = require('cluster');
+const cluster = require('cluster');
 const arraySort = require('array-sort');
 const progress = require('cli-progress');
 const readline = require("readline");
@@ -13,47 +13,63 @@ let osmProcess = require('./osm.js');
 const config = JSON.parse(fs.readFileSync('./config.json'));
 // 'C:\\Users\\GurumNyang\\Downloads\\네이버 웨일 다운로드\\exe\\highways1_01.pbf'
 
-let cell = [];
-let nodes = [];
-let ways = [];
+let cell;
+let nodes;
+let ways;
 
 if (cluster.isMaster) {
     let stableWorker = 0;
+
 
     console.log(`Primary ${process.pid} is running`);
     osmProcess = new osmProcess(config.lat, config.lon);
     osmProcess.init(true).then(()=>{
         console.log(os.cpus().length + '개의 CPU 코어 확인.');
+        cell = osmProcess.cell;
+        nodes = osmProcess.nodes;
+        ways = osmProcess.ways;
+
+        fs.writeFileSync('./clusterData.json', JSON.stringify({
+            cell: osmProcess.cell,
+            nodes: osmProcess.nodes,
+            ways: osmProcess.ways
+        }));
+
+        console.log('OSM 정보 읽기 완료.');
 
         // Fork workers.
         for (let i = 0; i < os.cpus().length; i++) {
             var worker = cluster.fork();
             let workerId = i;
-            worker.on('message', (e)=>
-                {
-                    switch(e.header){
-                        case 'ready':
-                        {
-
-                            console.log(`Worker ${workerId} is ready. pid: ${e.data.id}`);
-                            stableWorker++;
-                            if(stableWorker == os.cpus().length) {
-                                console.log('waysCoord Start');
-                                broadcast({
-                                    header: 'waysCoord',
-                                    data: {
-                                        ways: osmProcess.ways,
-                                        nodes: osmProcess.nodes,
-                                        cell: osmProcess.cell
-                                    }
-                                });
-                            }
-                            break;
+            worker.on('message', (e)=>{
+                switch(e.header){
+                    case 'ready':
+                    {
+                        console.log(`Worker ${workerId} is ready. pid: ${e.data.id}`);
+                        stableWorker++;
+                        if(stableWorker == os.cpus().length) {
+                            stableWorker = 0;
+                            console.log('waysCoord 데이터 생성 시작.');
+                            broadcast({
+                                header: 'waysCoord'
+                            });
                         }
+                        break;
                     }
-                    // console.log(e);
+                    case 'done_waysCoord':
+                    {
+                        stableWorker++;
+                        if(stableWorker == os.cpus().length) {
+                            stableWorker = 0;
+                            console.log('waysCoord 데이터 생성 완료.');
+                            // broadcast({
+                            //     header: 'waysCoord'
+                            // });
+                        }
+                        break;
+                    }
                 }
-            );
+            });
         }
 
     });
@@ -62,71 +78,21 @@ if (cluster.isMaster) {
     cluster.on('exit', (worker, code, signal) => {
         console.log(`worker ${worker.process.pid} died`);
     });
-} else {
+}
+else {
     osmProcess = new osmProcess(config.lat, config.lon, false);
     osmProcess.init(false).then(()=>
         {
             process.send({header:'ready', data:{id:process.pid}});
         }
     );
-
-
     process.on('message', (e)=> {
         switch (e.header) {
             case 'waysCoord':
             {
-                osmProcess.ways = e.data.ways;
-                osmProcess.nodes = e.data.nodes;
-                osmProcess.cell = e.data.cell;
-                osmProcess.waysCoord(false, e.worker.id, e.length,
-                    (type, data)=>
-                    {
-                        /*data 형태
-                        data {
-                            index
-                            name(ex.roadData)
-                            value
-                        }*/
-                        switch(type){
-                            case 'push':
-                            {
-                                if(data.name){
-                                    ways[data.index][data.name].push(data.value);
-                                }
-                                break;
-                            }
-                            case 'set':
-                            {
-
-                                if(data.name){
-                                    ways[data.index][data.name] = (data.value);
-                                }
-                                break;
-                            }
-                        }
-                    },
-                    (type, data)=>
-                    {
-                        switch(type){
-                            case 'push':
-                            {
-                                if(data.name){
-                                    nodes[data.index][data.name].push(data.value);
-                                }
-                                break;
-                            }
-                            case 'set':
-                            {
-
-                                if(data.name){
-                                    nodes[data.index][data.name] = (data.value);
-                                }
-                                break;
-                            }
-                        }
-                    }
-                ).then(()=>{
-
+                osmProcess.waysCoord(false, e.worker.id, e.length).then(()=>{
+                    console.log(`Worker ${e.worker.id} is done_waysCoord`);
+                    process.send({header:'done_waysCoord', data:{id:process.pid}});
                 });
                 break;
             }
@@ -135,7 +101,7 @@ if (cluster.isMaster) {
 }
 
 //cluster broadcast
-function broadcast(data){
+async function broadcast(data){
     if(cluster.isMaster){
         Object.values(cluster.workers).forEach((worker)=>{
             data.worker = worker;
