@@ -1,14 +1,10 @@
 const fs = require('fs');
-const through = require('through2');
-const parseOSM = require('osm-pbf-parser');
-const arraySort = require('array-sort');
 const progress = require('cli-progress');
 const readline = require("readline");
-const canvas = require('canvas');
 
 
-let config = JSON.parse(fs.readFileSync("./config.json"));
-let roadType = JSON.parse(fs.readFileSync('./roadType.json'));
+let config = JSON.parse(fs.readFileSync("./config.json").toString());
+let roadType = JSON.parse(fs.readFileSync('./roadType.json').toString());
 
 const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon);
 

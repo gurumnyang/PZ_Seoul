@@ -36,9 +36,11 @@ module.exports = class osmRead {
             resolve();
         });
     }
-    loadData(filePath) {
-        return new Promise((resolve, reject) => {
+    loadData() {
+        return new Promise((resolve) => {
+
             console.log('불러오는 중');
+
             fs.createReadStream(config.fileSrc)
                 .pipe(this.osm)
                 .pipe(through.obj((items, enc, next)=> {
@@ -61,9 +63,10 @@ module.exports = class osmRead {
         });
     }
     parseData(){
-        return new Promise(async (resolve, reject)=> {
+        return new Promise(async (resolve)=> {
             await this.nodeArrayHash();
             await this.nodeAdd();
+            resolve();
         });
 
     }
