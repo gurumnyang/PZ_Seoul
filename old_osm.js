@@ -1,10 +1,10 @@
 const fs = require('fs');
 const through = require('through2');
 const parseOSM = require('osm-pbf-parser');
-const canvas = require('canvas');
 const arraySort = require('array-sort');
 const progress = require('cli-progress');
 const readline = require("readline");
+const canvas = require('canvas');
 
 let config = JSON.parse(fs.readFileSync("./config.json"));
 let roadType = JSON.parse(fs.readFileSync('./roadType.json'));
@@ -71,7 +71,7 @@ class Init{
 
             }
             resolve();
-        })
+        });
     }
     setData(){
         var data = JSON.parse(fs.readFileSync('./clusterData.json').toString());
@@ -88,7 +88,7 @@ class Init{
                 }
             }
             resolve();
-        })
+        });
     }
     readFile(){
         return new Promise(resolve => {
@@ -130,12 +130,7 @@ class Init{
             let roads = JSON.parse(fs.readFileSync(config.roadFileSrc).toString());
             for(let wayIndex = range[0]; wayIndex < (range[1]+1);wayIndex++){
                 // progress_callback('increment',{length: wayIndex - range[0]});
-                try {
-                    this.ways[wayIndex].tags.name
-                } catch (e) {
-                    console.log(wayIndex);
-                    console.log(e);
-                }
+
                 if(this.ways[wayIndex].tags.name){
                     let roadFound = roadBindFind(this.ways[wayIndex].tags.name, roads.DATA);
                     if(roadFound){
@@ -149,23 +144,8 @@ class Init{
                     //var found = this.nodes.find(e => e.id==this.ways[wayIndex].refs[obj]);
                     const found = bindFind(this.ways[wayIndex].refs[obj], this.nodes);
                     if(found){
-                        if(this.nodes[this.nodes.indexOf(found)].ways){
-                            this.nodes[this.nodes.indexOf(found)].ways.push(this.ways[wayIndex].id);
-                            addNodes.push({
-                                type: 'push',
-                                index: this.nodes.indexOf(found),
-                                name: 'ways',
-                                value: this.ways[wayIndex].id
-                            });
-                        } else {
-                            this.nodes[this.nodes.indexOf(found)].ways = [this.ways[wayIndex].id];
-                            addNodes.push({
-                                type: 'set',
-                                index: this.nodes.indexOf(found),
-                                name: 'ways',
-                                value: this.ways[wayIndex].id
-                            });
-                        }
+                        if(!this.nodes[this.nodes.indexOf(found)].ways) this.nodes[this.nodes.indexOf(found)].ways = [];
+                        this.nodes[this.nodes.indexOf(found)].ways.push(this.ways[wayIndex].id);
                         this.ways[wayIndex].refs[obj] = {
                             id: found.id,
                             lat: found.lat,
@@ -179,8 +159,8 @@ class Init{
                 newWays.push(this.ways[wayIndex]);
             }
 
-            fs.writeFileSync(`./data/newWays_${workerNumber}.json`, JSON.stringify(newWays));
-            fs.writeFileSync(`./data/addNodes_${workerNumber}.json`, JSON.stringify(addNodes));
+            // fs.writeFileSync(`./data/newWays_${workerNumber}.json`, JSON.stringify(newWays));
+            // fs.writeFileSync(`./data/addNodes_${workerNumber}.json`, JSON.stringify(addNodes));
             resolve();
         });
 
@@ -195,7 +175,7 @@ class Init{
                 (this.cell)[Math.floor(toMeter('lat', lat[0] - item.lat ) / 300)][Math.floor(toMeter('lon', item.lon - lon[0]) / 300)].push(item);
             }
             resolve();
-        })
+        });
     }
     generate(x,y){
         // 0 1 2
