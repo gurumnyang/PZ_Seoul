@@ -56,8 +56,8 @@ module.exports = class osmRead {
                     });
                     next();
                 })).on('finish', ()=>{
-                this.ways = arraySort(this.ways, 'id');
-                this.nodes = arraySort(this.nodes, 'id');
+                this.ways = arraySort(this.ways, 'id', {});
+                this.nodes = arraySort(this.nodes, 'id', {});
                 resolve();
             });
         });
