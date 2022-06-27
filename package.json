@@ -6,6 +6,7 @@
     "cluster": "^0.7.7",
     "cluster-shared-memory": "^1.1.5",
     "fs-extra": "^10.1.0",
+    "nodemon": "^2.0.18",
     "osm-pbf-parser": "^2.3.0",
     "through2": "^4.0.2"
   }

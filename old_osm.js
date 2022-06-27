@@ -241,12 +241,6 @@ class Init{
         /**
          * @todo lineWidth Object .roadDATA USE
          */
-        let widthData = [
-            {
-                name:'4이상8미만',
-                width:6
-            }
-        ]
         for(let route of cellWays){
             ctx.beginPath();
             for(let pointIdx in route.refs){

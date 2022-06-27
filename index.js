@@ -37,4 +37,5 @@ const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon);
     await readOsm.init();
     await readOsm.loadData();
     await readOsm.parseData();
+    await readOsm.generate(50, 50);
 })();

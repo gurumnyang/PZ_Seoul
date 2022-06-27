@@ -2,9 +2,12 @@ const fs = require('fs');
 const through = require('through2');
 const arraySort = require('array-sort');
 const convert = require('./convert.js');
+const path = require('path')
 
 const parseOSM = require('osm-pbf-parser');
+const canvas = require("canvas");
 const config = JSON.parse(fs.readFileSync('./config.json').toString());
+const roadType = JSON.parse(fs.readFileSync('./roadType.json').toString());
 
 module.exports = class osmRead {
     constructor(lat, lon) {
@@ -66,6 +69,8 @@ module.exports = class osmRead {
         return new Promise(async (resolve)=> {
             await this.nodeArrayHash();
             await this.nodeAdd();
+            await this.nodeToCell();
+            await this.wayArrayHash();
             resolve();
         });
 
@@ -80,6 +85,13 @@ module.exports = class osmRead {
         });
     }
     wayArrayHash(){
+        return new Promise(resolve=>{
+            this.wayHash = {};
+            for(let way of this.ways){
+                this.wayHash[way.id] = way;
+            }
+            resolve();
+        });
     }
 
     nodeAdd(){
@@ -105,5 +117,120 @@ module.exports = class osmRead {
         }
         console.log(new Date() - start+'ms');
         console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.ways.length, 'ms');
+    }
+    nodeToCell(){
+        return new Promise(resolve => {
+            for(let item of this.nodes){
+                (this.cell)[Math.floor(convert.toMeter('lat', config.lat[0] - item.lat ) / 300)][Math.floor(convert.toMeter('lon', item.lon - config.lon[0]) / 300)].push(item.id);
+            }
+            resolve();
+        });
+    }
+    generate(x, y){
+        let img = canvas.createCanvas(300,300);
+        let ctx = img.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        let coord = {
+            x: this.lon[0] + convert.toAngle('lon', x*300),
+            y: this.lat[0] - convert.toAngle('lat', y*300)
+        }
+        ctx.fillStyle = "#a5a08c"
+        ctx.fillRect(0,0,300,300);
+        ctx.lineWidth = 2;
+
+        //ways will be render.
+        let cellWays_id = [];
+        let cellWays = [];
+        let notFound = [];
+
+        let task = [
+            [1,-1],
+            [1,0],
+            [1,1],
+            [0,-1],
+            [0,0],
+            [0,1],
+            [-1,-1],
+            [-1,0],
+            [-1,1]
+        ];
+        for(let i = 0; i <task.length; i++){
+            const cellObj = this.cell[y + task[i][0]][x + task[i][1]];
+            for(let obj_id of cellObj){
+                let obj = this.nodeHash[obj_id];
+                if(!obj) {
+                    console.log(`nodeHash에 해당 노드가 존재하지 않음. ID: ${obj_id}`);
+                    notFound.push(obj_id);
+                    continue;
+                }
+                if(!obj.ways) continue; //node중엔 경유지점이 없는 것도 있다.
+                for(let obj_1 of obj.ways){
+                    console.log(obj_1);
+                    const found = this.wayHash[obj_1];
+                    if(found){
+                        if(!cellWays_id.find(e => (e == found.id))){
+                            cellWays.push(found);
+                            cellWays_id.push(found.id);
+                        }
+                    } else {
+                        notFound.push(obj_1);
+                    }
+                }
+            }
+        }
+
+        //change ctx setting to rendering roads.
+        ctx.strokeStyle = '#646464';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 1;
+
+        /**
+         * @todo lineWidth Object .roadDATA USE
+         */
+
+        for(let route of cellWays){
+            ctx.beginPath();
+            for(let pointIdx in route.refs){
+
+                if(route.roadData){
+                    console.log(route.roadData);
+                    // ctx.lineWidth = 뭐시기
+                }
+                if(pointIdx === 0) {
+                    ctx.moveTo(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x), convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y));
+                }
+                else {
+                    ctx.lineTo(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x), convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y));
+                }
+            }
+            ctx.stroke();
+        }
+        ctx.fillStyle = 'white';
+        ctx.fillText(coord.x, 0,10);
+        ctx.fillText(coord.y, 0, 20);
+
+        return new Promise(resolve => {
+            img.createPNGStream().pipe(fs.createWriteStream(path.join(__dirname,'/rendered/'+x+'_'+y+'.png'))
+                .on('finish', ()=>{
+
+                console.log('\n');
+                console.log(coord);
+                console.log('/rendered/'+x+'_'+y+'.png saved');
+
+                //rendering veg image
+                img = canvas.createCanvas(30,30);
+                ctx = img.getContext('2d');
+                ctx.imageSmoothingEnabled = false;
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0,0,30,30);
+
+                img.createPNGStream().pipe(fs.createWriteStream('/rendered/'+x+'_'+y+'_veg.png')
+                    .on('finish',()=>{
+                    if(notFound.length> 0) console.log(notFound.length, '개의 Node를 찾을 수 없음.');
+                    console.log('/rendered/'+x+'_'+y+'_veg.png saved');
+                    resolve();
+                }))
+            }));
+        });
     }
 }
