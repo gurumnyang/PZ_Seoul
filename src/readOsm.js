@@ -8,6 +8,7 @@ const parseOSM = require('osm-pbf-parser');
 const canvas = require("canvas");
 const config = JSON.parse(fs.readFileSync('./config.json').toString());
 const roadType = JSON.parse(fs.readFileSync('./roadType.json').toString());
+const roadData = JSON.parse(fs.readFileSync(config.roadFileSrc).toString());
 
 module.exports = class osmRead {
     constructor(lat, lon) {
@@ -97,6 +98,16 @@ module.exports = class osmRead {
     nodeAdd(){
         let start = new Date();
         for(let obj of this.ways){
+
+            if(obj.tags.name){
+                let roadFound = roadBindFind(this.ways[wayIndex].tags.name, roads.DATA);
+                if(roadFound){
+                    this.ways[wayIndex].roadData = roadFound;
+                } else {
+                    this.ways[wayIndex].roadData = null;
+                }
+            }
+
             for(let refIndex in obj.refs){
                 if(typeof obj.refs[refIndex] !== 'number') continue;
                 let nodeObj = this.nodeHash[obj.refs[refIndex]];
@@ -165,7 +176,6 @@ module.exports = class osmRead {
                 }
                 if(!obj.ways) continue; //node중엔 경유지점이 없는 것도 있다.
                 for(let obj_1 of obj.ways){
-                    console.log(obj_1);
                     const found = this.wayHash[obj_1];
                     if(found){
                         if(!cellWays_id.find(e => (e == found.id))){
@@ -232,5 +242,23 @@ module.exports = class osmRead {
                 }))
             }));
         });
+    }
+}
+
+function roadBindFind(id, data){
+    let low = 0;
+    let high = data.length - 1;
+    let mid = Math.floor((low + high) / 2);
+    while(true){
+        mid =  Math.floor((low + high)/2);
+        if(low>high) return false;
+        if(data[mid].rod_num === id){
+            return data[mid];
+        }
+        if([id, data[mid].rod_num].sort()[0] === id){
+            high = mid - 1;
+        } else {
+            low = mid + 1;
+        }
     }
 }
