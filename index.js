@@ -6,7 +6,7 @@ const readline = require("readline");
 let config = JSON.parse(fs.readFileSync("./config.json").toString());
 let roadType = JSON.parse(fs.readFileSync('./roadType.json').toString());
 
-const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon);
+const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon, __dirname);
 
 
 // 위도 37.6875428, 37.4307532 111km
@@ -37,5 +37,9 @@ const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon);
     await readOsm.init();
     await readOsm.loadData();
     await readOsm.parseData();
-    await readOsm.generate(50, 50);
+    for(var x = 0; x < readOsm.lonCell; x++){
+        for(var y = 0; y < readOsm.latCell; y++){
+            await readOsm.generate(x, y);
+        }
+    }
 })();
