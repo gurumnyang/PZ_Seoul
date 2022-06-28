@@ -3,6 +3,7 @@ const through = require('through2');
 const arraySort = require('array-sort');
 const convert = require('./convert.js');
 const path = require('path')
+const os = require('os');
 
 const parseOSM = require('osm-pbf-parser');
 const canvas = require("canvas");
@@ -11,7 +12,7 @@ const roadType = JSON.parse(fs.readFileSync('./roadType.json').toString());
 const roadData = JSON.parse(fs.readFileSync(config.roadFileSrc).toString());
 
 module.exports = class osmRead {
-    constructor(lat, lon) {
+    constructor(lat, lon, src) {
         this.lat = lat;
         this.lon = lon;
         this.cell = [];
@@ -20,6 +21,7 @@ module.exports = class osmRead {
         this.latCell = convert.toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = convert.toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
         this.osm = parseOSM();
+        this.src = src;
     }
     init(){
         return new Promise(async resolve=>{
@@ -97,25 +99,25 @@ module.exports = class osmRead {
 
     nodeAdd(){
         let start = new Date();
-        for(let obj of this.ways){
+        for(let way_index in this.ways){
 
-            if(obj.tags.name){
-                let roadFound = roadBindFind(this.ways[wayIndex].tags.name, roads.DATA);
+            if(this.ways[way_index].tags.name){
+                let roadFound = roadBindFind(this.ways[way_index].tags.name, roadData.DATA);
                 if(roadFound){
-                    this.ways[wayIndex].roadData = roadFound;
+                    this.ways[way_index].roadData = roadFound;
                 } else {
-                    this.ways[wayIndex].roadData = null;
+                    this.ways[way_index].roadData = null;
                 }
             }
 
-            for(let refIndex in obj.refs){
-                if(typeof obj.refs[refIndex] !== 'number') continue;
-                let nodeObj = this.nodeHash[obj.refs[refIndex]];
+            for(let refIndex in this.ways[way_index].refs){
+                if(typeof this.ways[way_index].refs[refIndex] !== 'number') continue;
+                let nodeObj = this.nodeHash[this.ways[way_index].refs[refIndex]];
                 if(nodeObj){
-                    if(!this.nodeHash[obj.refs[refIndex]].ways) this.nodeHash[obj.refs[refIndex]].ways = [];
-                    this.nodeHash[obj.refs[refIndex]].ways.push(obj.id);
+                    if(!this.nodeHash[this.ways[way_index].refs[refIndex]].ways) this.nodeHash[this.ways[way_index].refs[refIndex]].ways = [];
+                    this.nodeHash[this.ways[way_index].refs[refIndex]].ways.push(this.ways[way_index].id);
 
-                    obj.refs[refIndex] = {
+                    this.ways[way_index].refs[refIndex] = {
                         id: nodeObj.id,
                         lat: nodeObj.lat,
                         lon: nodeObj.lon
@@ -127,7 +129,7 @@ module.exports = class osmRead {
             }
         }
         console.log(new Date() - start+'ms');
-        console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.ways.length, 'ms');
+        console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.ways.length/1000, '초');
     }
     nodeToCell(){
         return new Promise(resolve => {
@@ -138,6 +140,7 @@ module.exports = class osmRead {
         });
     }
     generate(x, y){
+        let start = new Date();
         let img = canvas.createCanvas(300,300);
         let ctx = img.getContext('2d');
         ctx.imageSmoothingEnabled = false;
@@ -166,7 +169,9 @@ module.exports = class osmRead {
             [-1,1]
         ];
         for(let i = 0; i <task.length; i++){
+            if(!this.cell[y + task[i][0]]) continue;
             const cellObj = this.cell[y + task[i][0]][x + task[i][1]];
+            if(!cellObj) continue;
             for(let obj_id of cellObj){
                 let obj = this.nodeHash[obj_id];
                 if(!obj) {
@@ -199,12 +204,21 @@ module.exports = class osmRead {
          */
 
         for(let route of cellWays){
+            if(route.tags.highway == 'footway') continue;
+            // console.log(route.tags.highway);
             ctx.beginPath();
             for(let pointIdx in route.refs){
-
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#646464';
                 if(route.roadData){
-                    console.log(route.roadData);
+                    if(!!roadType[route.roadData["siz_cde_nm2"]]){
+                        ctx.lineWidth = roadType[route.roadData["siz_cde_nm2"]];
+                    } else {
+                        console.log('roadType failed to load', route.roadData["siz_cde_nm2"]);
+                    }
                     // ctx.lineWidth = 뭐시기
+                } else {
+                    // ctx.strokeStyle = '#c86464';
                 }
                 if(pointIdx === 0) {
                     ctx.moveTo(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x), convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y));
@@ -212,32 +226,37 @@ module.exports = class osmRead {
                 else {
                     ctx.lineTo(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x), convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y));
                 }
-            }
+            };!
             ctx.stroke();
         }
-        ctx.fillStyle = 'white';
-        ctx.fillText(coord.x, 0,10);
-        ctx.fillText(coord.y, 0, 20);
+        // ctx.fillStyle = 'white';
+        // ctx.fillText(coord.x, 0,10);
+        // ctx.fillText(coord.y, 0, 20);
 
         return new Promise(resolve => {
-            img.createPNGStream().pipe(fs.createWriteStream(path.join(__dirname,'/rendered/'+x+'_'+y+'.png'))
+            img.createPNGStream().pipe(fs.createWriteStream(path.join(this.src,'/rendered/'+x+'_'+y+'.png'))
                 .on('finish', ()=>{
 
                 console.log('\n');
-                console.log(coord);
-                console.log('/rendered/'+x+'_'+y+'.png saved');
+                // console.log(coord);
+                // console.log('/rendered/'+x+'_'+y+'.png saved');
 
                 //rendering veg image
-                img = canvas.createCanvas(30,30);
+                img = canvas.createCanvas(300,300);
                 ctx = img.getContext('2d');
                 ctx.imageSmoothingEnabled = false;
                 ctx.fillStyle = 'black';
-                ctx.fillRect(0,0,30,30);
+                ctx.fillRect(0,0,300,300);
 
-                img.createPNGStream().pipe(fs.createWriteStream('/rendered/'+x+'_'+y+'_veg.png')
+                img.createPNGStream().pipe(fs.createWriteStream(path.join(this.src,'/rendered/'+x+'_'+y+'_veg.png'))
                     .on('finish',()=>{
                     if(notFound.length> 0) console.log(notFound.length, '개의 Node를 찾을 수 없음.');
-                    console.log('/rendered/'+x+'_'+y+'_veg.png saved');
+                    if(!this.average) this.average = (new Date() - start);
+                    else this.average = ((this.average*49) + (new Date() - start))/50;
+
+                    console.clear();
+
+                    console.log(`[${x},${y}] rendered in ${(new Date() - start)}ms average: ${Math.floor(this.average*10)/10}ms`);
                     resolve();
                 }))
             }));
