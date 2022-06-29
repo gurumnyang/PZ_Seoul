@@ -37,8 +37,8 @@ const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon, __dirn
     await readOsm.init();
     await readOsm.loadData();
     await readOsm.parseData();
-    for(var x = 0; x < readOsm.lonCell; x++){
-        for(var y = 0; y < readOsm.latCell; y++){
+    for(let x = 0; x < readOsm.lonCell; x++){
+        for(let y = 0; y < readOsm.latCell; y++){
             await readOsm.generate(x, y);
         }
     }

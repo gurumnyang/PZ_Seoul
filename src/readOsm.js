@@ -143,12 +143,12 @@ module.exports = class osmRead {
         let start = new Date();
         let img = canvas.createCanvas(300,300);
         let ctx = img.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
+
         let coord = {
             x: this.lon[0] + convert.toAngle('lon', x*300),
             y: this.lat[0] - convert.toAngle('lat', y*300)
         }
-        ctx.fillStyle = "#a5a08c"
+        ctx.fillStyle = "#787878"
         ctx.fillRect(0,0,300,300);
         ctx.lineWidth = 2;
 
@@ -168,6 +168,7 @@ module.exports = class osmRead {
             [-1,0],
             [-1,1]
         ];
+
         for(let i = 0; i <task.length; i++){
             if(!this.cell[y + task[i][0]]) continue;
             const cellObj = this.cell[y + task[i][0]][x + task[i][1]];
@@ -198,14 +199,15 @@ module.exports = class osmRead {
         ctx.strokeStyle = '#646464';
         ctx.lineWidth = 2;
         ctx.globalAlpha = 1;
+        ctx.antialias = 'none';
 
         /**
          * @todo lineWidth Object .roadDATA USE
          */
 
+
         for(let route of cellWays){
             if(route.tags.highway == 'footway') continue;
-            // console.log(route.tags.highway);
             ctx.beginPath();
             for(let pointIdx in route.refs){
                 ctx.lineWidth = 2;
@@ -221,12 +223,12 @@ module.exports = class osmRead {
                     // ctx.strokeStyle = '#c86464';
                 }
                 if(pointIdx === 0) {
-                    ctx.moveTo(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x), convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y));
+                    ctx.moveTo(Math.floor(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y)));
                 }
                 else {
-                    ctx.lineTo(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x), convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y));
+                    ctx.lineTo(Math.floor(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y)));
                 }
-            };!
+            };
             ctx.stroke();
         }
         // ctx.fillStyle = 'white';
@@ -244,7 +246,8 @@ module.exports = class osmRead {
                 //rendering veg image
                 img = canvas.createCanvas(300,300);
                 ctx = img.getContext('2d');
-                ctx.imageSmoothingEnabled = false;
+                ctx.antialias = 'none';
+
                 ctx.fillStyle = 'black';
                 ctx.fillRect(0,0,300,300);
 
