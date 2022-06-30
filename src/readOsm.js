@@ -235,6 +235,7 @@ module.exports = class osmRead {
         // ctx.fillText(coord.x, 0,10);
         // ctx.fillText(coord.y, 0, 20);
 
+        if(!fs.existsSync(path.join(this.src,'/rendered/'))) fs.mkdirSync(path.join(this.src,'/rendered/'));
         return new Promise(resolve => {
             img.createPNGStream().pipe(fs.createWriteStream(path.join(this.src,'/rendered/'+x+'_'+y+'.png'))
                 .on('finish', ()=>{
