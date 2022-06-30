@@ -266,6 +266,15 @@ module.exports = class osmRead {
             }));
         });
     }
+    showCellData(x, y){
+        for(let obj of this.cell[y][x]){
+            if(!this.nodeHash[obj].ways) continue;
+            for(let way_index of this.nodeHash[obj].ways){
+                console.log(this.wayHash[way_index])
+            }
+        }
+    }
+
 }
 
 function roadBindFind(id, data){
