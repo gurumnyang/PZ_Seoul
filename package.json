@@ -9,6 +9,7 @@
     "nodemon": "^2.0.18",
     "osm-pbf-parser": "^2.3.0",
     "through2": "^4.0.2",
+    "voronoi-diagram": "^1.0.1",
     "xml-js": "^1.6.11"
   }
 }
