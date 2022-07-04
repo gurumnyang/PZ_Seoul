@@ -20,18 +20,18 @@ const reader = XmlReader.create({stream: true});
 reader.on('tag', (name, data) => {
 
     switch(name){
-    case 'node':
+        case 'node':
         nodeList.push(data.attributes.id);
-        nodeHash[data.id] = data;
+        nodeHash[data.attributes.id] = data;
         break;
     case 'way':
         wayList.push(data.attributes.id);
-        wayHash[data.id] = data;
+        wayHash[data.attributes.id] = data;
         break;
     case 'relation':
         if(!!data.parent) console.log('parent 존재함');
         relationList.push(data.attributes.id);
-        relationHash[data.id] = data;
+        relationHash[data.attributes.id] = data;
         break;
     }
 });
