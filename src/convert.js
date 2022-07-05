@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const appRoot = process.cwd();
 
-let config = JSON.parse(fs.readFileSync(path.join(__dirname + "/config.json")).toString());
+let config = JSON.parse(fs.readFileSync(path.join(appRoot, "/config.json")).toString());
 
 module.exports.getDistance = function getDistance(lat, lon){
     return Math.sqrt(Math.abs(lat[0]-lat[1]) + Math.abs(lon[0]-lon[1]));

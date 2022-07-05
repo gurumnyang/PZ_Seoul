@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const {parse, stringify, toJSON, fromJSON} = require('flatted');
 
+/*
+xml 파일을 파싱하여 직접 작업하는 방식. 속도가 매우 느리다.
+ */
+
 let nodeList = [],
     nodeHash = {},
     wayList = [],
