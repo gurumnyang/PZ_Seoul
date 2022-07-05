@@ -96,7 +96,6 @@ module.exports = class osmRead {
             resolve();
         });
     }
-
     nodeAdd(){
         let start = new Date();
         for(let way_index in this.ways){

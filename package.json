@@ -10,6 +10,7 @@
     "osm-pbf-parser": "^2.3.0",
     "polygon-clipping": "^0.15.3",
     "through2": "^4.0.2",
+    "voronoi-diagram": "^1.0.1",
     "xml-js": "^1.6.11",
     "xml-reader": "^2.4.3"
   }

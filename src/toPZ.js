@@ -2,6 +2,7 @@ const convert = require('xml-js');
 const fs = require('fs');
 const fsE = require('fs-extra');
 const path = require('path');
+const polygonClipping = require('polygon-clipping');
 
 module.exports = class toPZ{
     constructor(saveSrc, mapName) {

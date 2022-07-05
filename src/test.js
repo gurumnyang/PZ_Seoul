@@ -10,10 +10,6 @@ let nodeList = [],
     relationList = [],
     relationHash = {}
 
-/**
- * @todo map.osm 파일 가공하여 residential 도로 지우고 주거건물도 다 날려 최적화할 것.
- * 어차피 버릴껀데
- */
 
 const reader = XmlReader.create({stream: true});
 
