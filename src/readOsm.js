@@ -24,8 +24,7 @@ module.exports = class osmRead {
         this.src = src;
     }
     init(){
-        return new Promise(async resolve=>{
-            await this.genCell();
+        return new Promise(async resolve=>{await this.genCell();
             console.log('위도 ',Math.floor(this.latCell),'셀, ', this.cell.length,'lat');
             console.log('경도 ',Math.floor(this.lonCell),'셀  ', this.cell[0].length,'lon');
             resolve();
