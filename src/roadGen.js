@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const appRoot = process.cwd();
+const convert = require(path.join(process.cwd(), '/src/convert.js'));
 
 
 /**
@@ -11,20 +12,23 @@ const appRoot = process.cwd();
 
 module.exports = function generate(extent, options){
     /**
-     * @todo extent 반복문 돌리면서 Atan2()인지뭔지하는 함수 사용해서 각도 구하고 extent.length / 5만큼
+     * @todo extent.length / 5만큼
      * 주요 꼭짓점 산출하여 폴리곤 단순화 + 중로 산출
      * @todo seed 값 활용하여 중로 외 소로급 세부 연결도로 산출할 것
      * @todo seed 값 활용하여 주거단지 내 세부 소로 및 통행도로 생성해낼 것
      * 건물 배치도 넣어주면 좋을 것이라 봄
      */
+
     let size = getSize(extent);
     let seed = Math.floor(Math.random()*10);
+
     // sequential road type
     /*
     중로1로
     소로3로
     소로2로
     */
+
     let primary = [],
         secondary = [],
         residential = [];
@@ -37,7 +41,7 @@ module.exports = function generate(extent, options){
     for(let index in extent){
         if(index === 0 || index === extent.length - 1) continue;
         // 각도 구하는 공식 적어야 함     여기해야함 여기해야함
-        let angle = (180/Math.PI) * Math.atan((extent[index+1].lat - extent[index].lat)/(extent[index+1].lon - extent[index-1].lon)) - Math.atan((extent[index-1].lat-extent[index].lat)/(extent[index-1].lon-extent[index].lon))
+        let angle = convert.getAngle(extent[index-1], extent[index], extent[index+1]);
         if(maxAngle.length < angleLength){
             maxAngle.push(angle);
             primary.push(extent[index][2]);

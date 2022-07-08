@@ -1,14 +1,17 @@
-const fs = require('fs');
-const through = require('through2');
-const arraySort = require('array-sort');
-const convert = require('./convert.js');
-const path = require('path')
-const os = require('os');
+const fs = require('fs'),
+through = require('through2'),
+path = require('path'),
+arraySort = require('array-sort'),
+convert = require('./convert.js'),
+canvas = require("canvas"),
+parseOSM = require('osm-pbf-parser');
 
-const parseOSM = require('osm-pbf-parser');
-const canvas = require("canvas");
-const config = JSON.parse(fs.readFileSync('./config.json').toString());
-const roadType = JSON.parse(fs.readFileSync('./roadType.json').toString());
+const appRoot = process.cwd();
+
+
+
+const config = JSON.parse(fs.readFileSync(path.join(appRoot, '/config.json')).toString());
+const roadType = JSON.parse(fs.readFileSync(path.join(appRoot, '/roadType.json')).toString());
 const roadData = JSON.parse(fs.readFileSync(config.roadFileSrc).toString());
 
 module.exports = class osmRead {
@@ -16,15 +19,22 @@ module.exports = class osmRead {
         this.lat = lat;
         this.lon = lon;
         this.cell = [];
-        this.nodes = [];
-        this.ways = [];
+
+        this.nodeList = [];
+        this.wayList = [];
+
+        //nodeHash, wayHash meaning data of nodeList and wayList
+        this.nodeHash = {};
+        this.wayHash = {};
+
         this.latCell = convert.toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = convert.toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
         this.osm = parseOSM();
         this.src = src;
     }
     init(){
-        return new Promise(async resolve=>{await this.genCell();
+        return new Promise(async resolve=>{
+            await this.genCell();
             console.log('위도 ',Math.floor(this.latCell),'셀, ', this.cell.length,'lat');
             console.log('경도 ',Math.floor(this.lonCell),'셀  ', this.cell[0].length,'lon');
             resolve();
@@ -51,71 +61,50 @@ module.exports = class osmRead {
                 .pipe(through.obj((items, enc, next)=> {
                     items.forEach((item)=> {
                         if(item.type === 'way'){
-                            this.ways.push(item);
+                            this.wayList.push(item.id);
+                            this.wayHash[item.id] = item;
                         }
-                        if(item.lat&&item.lon){
-                            if(item.type === 'node'){
-                                this.nodes.push(item);
-                            }
+                        if(item.type === 'node'){
+                            this.nodeList.push(item.id);
+                            this.nodeHash[item.id] = item;
                         }
                     });
                     next();
                 })).on('finish', ()=>{
-                this.ways = arraySort(this.ways, 'id', {});
-                this.nodes = arraySort(this.nodes, 'id', {});
+                this.wayList.sort(function(a, b){return a-b});
+                this.nodeList.sort(function(a, b){return a-b});
                 resolve();
             });
         });
     }
     parseData(){
         return new Promise(async (resolve)=> {
-            await this.nodeArrayHash();
             await this.nodeAdd();
             await this.nodeToCell();
-            await this.wayArrayHash();
-            resolve();
-        });
-
-    }
-    nodeArrayHash(){
-        return new Promise(resolve=>{
-            this.nodeHash = {};
-            for(let node of this.nodes){
-                this.nodeHash[node.id] = node;
-            }
-            resolve();
-        });
-    }
-    wayArrayHash(){
-        return new Promise(resolve=>{
-            this.wayHash = {};
-            for(let way of this.ways){
-                this.wayHash[way.id] = way;
-            }
             resolve();
         });
     }
     nodeAdd(){
         let start = new Date();
-        for(let way_index in this.ways){
+        for(let way_idx of this.wayList){
 
-            if(this.ways[way_index].tags.name){
-                let roadFound = roadBindFind(this.ways[way_index].tags.name, roadData.DATA);
+            if(this.wayHash[way_idx].tags.name){
+                let roadFound = roadBindFind(this.wayHash[way_idx].tags.name, roadData.DATA);
                 if(roadFound){
-                    this.ways[way_index].roadData = roadFound;
+                    this.wayHash[way_idx].roadData = roadFound;
                 } else {
-                    this.ways[way_index].roadData = null;
+                    this.wayHash[way_idx].roadData = null;
                 }
             }
 
-            for(let refIndex in this.ways[way_index].refs){
-                if(typeof this.ways[way_index].refs[refIndex] !== 'number') continue;
-                let nodeObj = this.nodeHash[this.ways[way_index].refs[refIndex]];
+            for(let refIndex in this.wayHash[way_idx].refs){
+                if(typeof this.wayHash[way_idx].refs[refIndex] !== 'number') continue;
+                let nodeObj = this.nodeHash[this.wayHash[way_idx].refs[refIndex]];
                 if(nodeObj){
-                    if(!this.nodeHash[this.ways[way_index].refs[refIndex]].ways) this.nodeHash[this.ways[way_index].refs[refIndex]].ways = [];
-                    this.nodeHash[this.ways[way_index].refs[refIndex]].ways.push(this.ways[way_index].id);
+                    if(!this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways) this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways = [];
+                    this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways.push(this.wayHash[way_idx].id);
 
-                    this.ways[way_index].refs[refIndex] = {
+                    this.wayHash[way_idx].refs[refIndex] = {
                         id: nodeObj.id,
                         lat: nodeObj.lat,
                         lon: nodeObj.lon
@@ -127,11 +116,12 @@ module.exports = class osmRead {
             }
         }
         console.log(new Date() - start+'ms');
-        console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.ways.length/1000, '초');
+        console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.wayList.length/1000, '초');
     }
     nodeToCell(){
         return new Promise(resolve => {
-            for(let item of this.nodes){
+            for(let idx of this.nodeList){
+                let item = this.nodeHash[idx];
                 (this.cell)[Math.floor(convert.toMeter('lat', config.lat[0] - item.lat ) / 300)][Math.floor(convert.toMeter('lon', item.lon - config.lon[0]) / 300)].push(item.id);
             }
             resolve();
@@ -269,6 +259,19 @@ module.exports = class osmRead {
             if(!this.nodeHash[obj].ways) continue;
             for(let way_index of this.nodeHash[obj].ways){
                 console.log(this.wayHash[way_index])
+            }
+        }
+    }
+
+    genResidential(){
+        for(let idx of this.nodeList){
+            let node = this.nodeHash[idx];
+            if(!node.tags || !node.ways) continue;
+            for(let obj of node.ways){
+                /**
+                 * @todo 이건 어떻게 할까?
+                 * 일단 ways 훑으면서 주거지역 area를 extract하는 것으로 하자.
+                 */
             }
         }
     }
