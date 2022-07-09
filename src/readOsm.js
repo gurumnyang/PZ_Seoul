@@ -267,11 +267,20 @@ module.exports = class osmRead {
         for(let idx of this.nodeList){
             let node = this.nodeHash[idx];
             if(!node.tags || !node.ways) continue;
-            for(let obj of node.ways){
+            for(let wayIdx of node.ways){
                 /**
                  * @todo 이건 어떻게 할까?
                  * 일단 ways 훑으면서 주거지역 area를 extract하는 것으로 하자.
                  */
+                let way = this.wayHash[wayIdx];
+                //roadType 검사
+                //road tag name 검사
+                if(way.roadData){
+                    console.log(way.roadData["siz_cde_nm2"]);
+                }
+                if(way.tags.name){
+                    console.log(way.tags.name);
+                }
             }
         }
     }
