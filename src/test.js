@@ -18,7 +18,6 @@ let nodeList = [],
 const reader = XmlReader.create({stream: true});
 
 reader.on('tag', (name, data) => {
-
     switch(name){
         case 'node':
         nodeList.push(data.attributes.id);

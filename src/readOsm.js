@@ -101,8 +101,41 @@ module.exports = class osmRead {
                 if(typeof this.wayHash[way_idx].refs[refIndex] !== 'number') continue;
                 let nodeObj = this.nodeHash[this.wayHash[way_idx].refs[refIndex]];
                 if(nodeObj){
+                    //ways 배열이 없으면 생성
                     if(!this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways) this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways = [];
+                    //ways 배열에 way_idx 추가
                     this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways.push(this.wayHash[way_idx].id);
+
+                    //vertex 배열이 없으면 생성
+                    if(!this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex) this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex = [];
+                    //vertex 배열에 vertex 추가
+                    this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push(this.nodeHash[this.wayHash[way_idx].refs[refIndex]]);
+
+                    /**
+                     * @todo 그 뭐냐 여기 그 그 뭐냐 vertex 종류가 애매함
+                     */
+                    if(refIndex === 0) {
+                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex+1]]
+                        ]);
+                    } else
+                    if(refIndex === this.wayHash[way_idx].refs.length-1){
+                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex-1]]
+                        ]);
+                    } else
+                    {
+                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex+1]]
+                        ]);
+                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
+                            this.nodeHash[this.wayHash[way_idx].refs[refIndex-1]]
+                        ]);
+                    }
 
                     this.wayHash[way_idx].refs[refIndex] = {
                         id: nodeObj.id,
@@ -272,15 +305,6 @@ module.exports = class osmRead {
                  * @todo 이건 어떻게 할까?
                  * 일단 ways 훑으면서 주거지역 area를 extract하는 것으로 하자.
                  */
-                let way = this.wayHash[wayIdx];
-                //roadType 검사
-                //road tag name 검사
-                if(way.roadData){
-                    console.log(way.roadData["siz_cde_nm2"]);
-                }
-                if(way.tags.name){
-                    console.log(way.tags.name);
-                }
             }
         }
     }
