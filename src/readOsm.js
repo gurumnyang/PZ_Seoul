@@ -116,6 +116,7 @@ module.exports = class osmRead {
                      */
                     if(refIndex === 0) {
                         this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.wayHash[way_idx],
                             this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
                             this.nodeHash[this.wayHash[way_idx].refs[refIndex+1]]
                         ]);
@@ -128,10 +129,12 @@ module.exports = class osmRead {
                     } else
                     {
                         this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.wayHash[way_idx],
                             this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
                             this.nodeHash[this.wayHash[way_idx].refs[refIndex+1]]
                         ]);
                         this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
+                            this.wayHash[way_idx],
                             this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
                             this.nodeHash[this.wayHash[way_idx].refs[refIndex-1]]
                         ]);
