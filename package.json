@@ -8,6 +8,7 @@
     "fs-extra": "^10.1.0",
     "nodemon": "^2.0.18",
     "osm-pbf-parser": "^2.3.0",
+    "planar-dual": "^1.0.2",
     "polygon-clipping": "^0.15.3",
     "through2": "^4.0.2",
     "voronoi-diagram": "^1.0.1",

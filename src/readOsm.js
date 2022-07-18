@@ -4,7 +4,8 @@ path = require('path'),
 arraySort = require('array-sort'),
 convert = require('./convert.js'),
 canvas = require("canvas"),
-parseOSM = require('osm-pbf-parser');
+parseOSM = require('osm-pbf-parser'),
+getFaces = require("planar-dual")
 
 const appRoot = process.cwd();
 
@@ -22,10 +23,12 @@ module.exports = class osmRead {
 
         this.nodeList = [];
         this.wayList = [];
+        this.vertextList = [];
 
         //nodeHash, wayHash meaning data of nodeList and wayList
         this.nodeHash = {};
         this.wayHash = {};
+        this.vertextHash = {};
 
         this.latCell = convert.toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = convert.toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
@@ -98,9 +101,12 @@ module.exports = class osmRead {
             }
 
             for(let refIndex in this.wayHash[way_idx].refs){
+
                 if(typeof this.wayHash[way_idx].refs[refIndex] !== 'number') continue;
+
                 let nodeObj = this.nodeHash[this.wayHash[way_idx].refs[refIndex]];
                 if(nodeObj){
+
                     //ways 배열이 없으면 생성
                     if(!this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways) this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways = [];
                     //ways 배열에 way_idx 추가
