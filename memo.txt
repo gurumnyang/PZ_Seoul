@@ -12,6 +12,14 @@ way.tags.highway type
   'elevator'
 ]
 
+[
+    'primary', 'secondary',
+    'trunk', 'tertiary',
+
+]
+
+
+
 도로정보 API의 질이 매우 떨어지므로 이에 대한 대응 방법을 모색하여야 함.
 
 <바닥 타일>
@@ -35,3 +43,7 @@ way.tags.highway type
 기본 잔디와, 약간의 나무     | 0 128 0
 밝고 긴 잔디               | 0 255 0
 없음 (black)              | 0 0 0
+
+
+그 유튜브에 괜찮은 맵제작 영상있더라 보면서 공부하자
+https://www.youtube.com/watch?v=FNvTHgY__zg
