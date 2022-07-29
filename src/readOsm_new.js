@@ -201,9 +201,7 @@ module.exports = class osmRead {
         ctx.globalAlpha = 1;
         ctx.antialias = 'none';
 
-        /**
-         * @todo lineWidth Object .roadDATA USE
-         */
+
 
 
         for(let route of cellWays){

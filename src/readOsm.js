@@ -1,15 +1,25 @@
 const fs = require('fs'),
-through = require('through2'),
-path = require('path'),
-arraySort = require('array-sort'),
-convert = require('./convert.js'),
-canvas = require("canvas"),
-parseOSM = require('osm-pbf-parser'),
-getFaces = require("planar-dual")
+    through = require('through2'),
+    path = require('path'),
+    arraySort = require('array-sort'),
+    GeoJSON = require('geojson'),
+    convert = require('./convert.js'),
+    canvas = require("canvas"),
+    turf = require('turf'),
+    parseOSM = require('osm-pbf-parser');
 
 const appRoot = process.cwd();
 
-
+// await readOsm.init();
+// await readOsm.loadData();
+// await readOsm.parseData();
+// await readOsm.getArea();
+// or await readOsm.loadArea();
+// for(let x = 0; x < readOsm.lonCell; x++){
+//     for(let y = 0; y < readOsm.latCell; y++){
+//         await readOsm.generate(x, y);
+//     }
+// }
 
 const config = JSON.parse(fs.readFileSync(path.join(appRoot, '/config.json')).toString());
 const roadType = JSON.parse(fs.readFileSync(path.join(appRoot, '/roadType.json')).toString());
@@ -20,15 +30,16 @@ module.exports = class osmRead {
         this.lat = lat;
         this.lon = lon;
         this.cell = [];
+        this.areaCell = [];
 
         this.nodeList = [];
         this.wayList = [];
-        this.vertextList = [];
+        this.edgeList = [];
 
         //nodeHash, wayHash meaning data of nodeList and wayList
         this.nodeHash = {};
         this.wayHash = {};
-        this.vertextHash = {};
+        this.edgeHash = {};
 
         this.latCell = convert.toMeter('lat', Math.abs(lat[0]-lat[1]))/300;
         this.lonCell = convert.toMeter('lon', Math.abs(lon[0]-lon[1]))/300;
@@ -49,6 +60,12 @@ module.exports = class osmRead {
                 (this.cell)[lat] = [];
                 for (let lon = 0; lon < Math.floor(this.lonCell); lon++) {
                     (this.cell)[lat][lon] = [];
+                }
+            }
+            for (let lat = 0; lat < Math.floor(this.latCell); lat++) {
+                (this.areaCell)[lat] = [];
+                for (let lon = 0; lon < Math.floor(this.lonCell); lon++) {
+                    (this.areaCell)[lat][lon] = [[], {}];
                 }
             }
             resolve();
@@ -88,6 +105,7 @@ module.exports = class osmRead {
         });
     }
     nodeAdd(){
+        //parseData
         let start = new Date();
         for(let way_idx of this.wayList){
 
@@ -112,55 +130,30 @@ module.exports = class osmRead {
                     //ways 배열에 way_idx 추가
                     this.nodeHash[this.wayHash[way_idx].refs[refIndex]].ways.push(this.wayHash[way_idx].id);
 
-                    //vertex 배열이 없으면 생성
-                    if(!this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex) this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex = [];
-                    //vertex 배열에 vertex 추가
-                    this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push(this.nodeHash[this.wayHash[way_idx].refs[refIndex]]);
-
-                    /**
-                     * @todo 그 뭐냐 여기 그 그 뭐냐 vertex 종류가 애매함
-                     */
-                    if(refIndex === 0) {
-                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
-                            this.wayHash[way_idx],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex+1]]
-                        ]);
-                    } else
-                    if(refIndex === this.wayHash[way_idx].refs.length-1){
-                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex-1]]
-                        ]);
-                    } else
-                    {
-                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
-                            this.wayHash[way_idx],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex+1]]
-                        ]);
-                        this.nodeHash[this.wayHash[way_idx].refs[refIndex]].vertex.push([
-                            this.wayHash[way_idx],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex]],
-                            this.nodeHash[this.wayHash[way_idx].refs[refIndex-1]]
-                        ]);
-                    }
-
                     this.wayHash[way_idx].refs[refIndex] = {
                         id: nodeObj.id,
                         lat: nodeObj.lat,
                         lon: nodeObj.lon
                     }
-
                 } else {
                     console.log('노드 누락됨. -' + obj.refs[refIndex]);
                 }
             }
+            for(let refIndex in this.wayHash[way_idx].refs){
+                if(refIndex != this.wayHash[way_idx].refs.length - 1){
+                    this.edgeList.push([
+                        this.wayHash[way_idx].refs[refIndex],
+                        this.wayHash[way_idx].refs[Number(refIndex)+1]
+                    ]);
+                }
+            }
+
         }
         console.log(new Date() - start+'ms');
-        console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.wayList.length/1000, '초');
+        console.log('하나의 ways당 소요된 시간: ', (new Date() - start)/this.wayList.length, 'ms');
     }
     nodeToCell(){
+        //parseData
         return new Promise(resolve => {
             for(let idx of this.nodeList){
                 let item = this.nodeHash[idx];
@@ -168,6 +161,82 @@ module.exports = class osmRead {
             }
             resolve();
         });
+    }
+    areaToCell(){
+        for(let ftrIdx in this.GeoJSONArea.features){
+            let item = this.GeoJSONArea.features[ftrIdx];
+            for(let coord of item.geometry.coordinates[0]){
+                if(this.areaCell
+                    [Math.floor(convert.toMeter('lat', config.lat[0] - coord[0] ) / 300)]
+                    [Math.floor(convert.toMeter('lon', coord[1] - config.lon[0]) / 300)][1][ftrIdx]) continue;
+
+                this.areaCell
+                    [Math.floor(convert.toMeter('lat', config.lat[0] - coord[0] ) / 300)]
+                    [Math.floor(convert.toMeter('lon', coord[1] - config.lon[0]) / 300)][1][ftrIdx]
+                    = {id:ftrIdx, data:item.geometry.coordinates[0]};
+                this.areaCell
+                    [Math.floor(convert.toMeter('lat', config.lat[0] - coord[0] ) / 300)]
+                    [Math.floor(convert.toMeter('lon', coord[1] - config.lon[0]) / 300)][0].push(ftrIdx);
+            }
+        }
+
+    }
+
+    showCellData(x, y){
+        for(let obj of this.cell[y][x]){
+            if(!this.nodeHash[obj].ways) continue;
+            for(let way_index of this.nodeHash[obj].ways){
+                console.log(this.wayHash[way_index])
+            }
+        }
+    }
+
+    getArea(length){
+        return new Promise((resolve) =>
+            {
+                let data = [];
+                let i = 0;
+                if(length == undefined) length = this.wayList.length;
+                for(let wayObj of this.wayList){
+                    if(i == length) break;
+                    wayObj = this.wayHash[wayObj];
+                    if(
+                        wayObj.tags.highway !== 'primary' &&
+                        wayObj.tags.highway !== 'secondary' &&
+                        wayObj.tags.highway !== 'trunk' &&
+                        wayObj.tags.highway !== 'tertiary'
+                    ) continue;
+                    let obj = {
+                        id: wayObj.id,
+                        coord: []
+                    }
+
+                    for(let refsObj of wayObj.refs){
+                        obj.coord.push([
+                            refsObj.lat,
+                            refsObj.lon
+                        ]);
+                    }
+                    data.push(obj);
+                    i++
+                }
+                this.GeoJSONWays = GeoJSON.parse(data, {'LineString': 'coord'});
+                console.log('처리 시작', i+'개의 ways를 처리하는 중...');
+                console.log('보통 분 단위의 시간이 소요됩니다. 잠시만 기다려주세요.');
+                let time = new Date().getTime();
+                this.GeoJSONArea = turf.polygonize(this.GeoJSONWays);
+                console.log('처리 완료', new Date().getTime() - time, 'ms', this.GeoJSONArea.features.length+'개 확인됨');
+                fs.writeFileSync(path.join(this.src,'/export/area.json'), JSON.stringify(this.GeoJSONArea));
+                resolve();
+            }
+        );
+    }
+    loadArea(){
+        return new Promise((resolve) => {
+                this.GeoJSONArea = JSON.parse(fs.readFileSync(path.join(this.src,'/export/area.json')).toString());
+                resolve();
+            }
+        );
     }
     generate(x, y){
         let start = new Date();
@@ -183,9 +252,11 @@ module.exports = class osmRead {
         ctx.lineWidth = 2;
 
         //ways will be render.
-        let cellWays_id = [];
         let cellWays = [];
+        let cellWays_id = [];
         let notFound = [];
+        //area will be render
+        let cellArea = [];
 
         let task = [
             [1,-1],
@@ -224,20 +295,39 @@ module.exports = class osmRead {
                 }
             }
         }
-
+        //for this.areaCell
+        for(let i = 0; i <task.length; i++){
+            if(!this.areaCell[y + task[i][0]]) continue;
+            var cellObj = this.areaCell[y + task[i][0]][x + task[i][1]];
+            if(!cellObj) continue;
+            for(let obj of cellObj[0]){
+                cellArea.push(cellObj[1][obj]);
+            }
+        }
         //change ctx setting to rendering roads.
         ctx.strokeStyle = '#646464';
         ctx.lineWidth = 2;
         ctx.globalAlpha = 1;
         ctx.antialias = 'none';
 
-        /**
-         * @todo lineWidth Object .roadDATA USE
-         */
 
-
+        //렌더링
+        for(let route of cellArea){
+            route = route.data
+            ctx.fillStyle = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+            ctx.beginPath();
+            for(let pointIdx in route){
+                if(pointIdx === 0) {
+                    ctx.moveTo(Math.floor(convert.toMeter('lon', route[pointIdx][1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route[pointIdx][0]) - (300*y)));
+                } else {
+                    ctx.lineTo(Math.floor(convert.toMeter('lon', route[pointIdx][1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route[pointIdx][0]) - (300*y)));
+                }
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
         for(let route of cellWays){
-            if(route.tags.highway == 'footway') continue;
+            if(route.tags.highway == 'footway'||route.tags.highway == 'residential'||route.tags.highway=='service') continue;
             ctx.beginPath();
             for(let pointIdx in route.refs){
                 ctx.lineWidth = 2;
@@ -296,26 +386,38 @@ module.exports = class osmRead {
             }));
         });
     }
-    showCellData(x, y){
-        for(let obj of this.cell[y][x]){
-            if(!this.nodeHash[obj].ways) continue;
-            for(let way_index of this.nodeHash[obj].ways){
-                console.log(this.wayHash[way_index])
-            }
-        }
-    }
 
-    genResidential(){
+    /*genResidential(){
         for(let idx of this.nodeList){
             let node = this.nodeHash[idx];
             if(!node.tags || !node.ways) continue;
             for(let wayIdx of node.ways){
-                /**
+                /!**
                  * @todo 이건 어떻게 할까?
                  * 일단 ways 훑으면서 주거지역 area를 extract하는 것으로 하자.
-                 */
+                 *!/
             }
         }
+    }*/
+    exportData(){
+        return new Promise(resolve => {
+            if(!fs.existsSync(path.join(this.src,'/export/'))) fs.mkdirSync(path.join(this.src,'/export/'));
+            let exportNodeList = this.nodeList;
+            let exportNodeHash = this.nodeHash;
+            let exportEdgeList = this.edgeList;
+
+            let exportNodeData = {
+                nodeList: exportNodeList,
+                nodeHash: exportNodeHash
+            }
+            let exportEdgeData = {
+                edgeList: exportEdgeList
+            }
+            fs.writeFileSync(path.join(this.src,'/export/node.json'), JSON.stringify(exportNodeData));
+            fs.writeFileSync(path.join(this.src,'/export/edge.json'), JSON.stringify(exportEdgeData));
+            console.log('완료');
+            resolve();
+        });
     }
 
 }

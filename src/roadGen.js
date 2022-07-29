@@ -32,48 +32,22 @@ module.exports = function generate(extent, options){
     let primary = [],
         secondary = [],
         residential = [];
-
-    //5 maximum road angle
-    let maxAngle = [];
-    let angleLength = Math.floor(extent.length/5);
-
-    //메인도로 구하기
-    for(let index in extent){
-        if(index === 0 || index === extent.length - 1) continue;
-        // 각도 구하는 공식 적어야 함     여기해야함 여기해야함
-        let angle = convert.getAngle(extent[index-1], extent[index], extent[index+1]);
-        if(maxAngle.length < angleLength){
-            maxAngle.push(angle);
-            primary.push(extent[index][2]);
-        }
-        if(angle > maxAngle[maxAngle.length - 1]){
-            for(let numIndex in maxAngle){
-                if(angle > maxAngle[numIndex]){
-                    //마지막꺼 지우고
-                    maxAngle.shift();
-                    primary.shift();
-                    //사이에 끼우고
-                    maxAngle.splice(maxAngle.length - 1, 0, angle);
-                    primary.splice(maxAngle.length - 1, 0, extent[index][2]);
-                    //종료
-                    break;
-                }
-            }
-        }
-    }
 }
 
 function getSize(extent){
+    // 정사각형 좌상 좌하 우상 우하 구하기
     let   minX = extent[0].lon
         , minY = extent[0].lat
         , maxX = extent[0].lon
         , maxY = extent[0].lat;
 
+    //가장큰놈 가장작은놈 산출
     for(let i=1; i<extent.length; i++){
         if(extent[i].lon < minX) minX = extent[i].lon;
         if(extent[i].lat < minY) minY = extent[i].lat;
         if(extent[i].lon > maxX) maxX = extent[i].lon;
         if(extent[i].lat > maxY) maxY = extent[i].lat;
     }
+    //선언한거 리턴
     return [[minX, minY],[maxX, maxY]];
 }
