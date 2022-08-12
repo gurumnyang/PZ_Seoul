@@ -37,6 +37,8 @@ module.exports = class toPZ{
         let xml = fs.readFileSync('../data/pzw/templete.xml', 'utf8').toString();
         let templete = JSON.parse(convert.xml2json(xml, {compact: true, spaces: 4}));
         console.log('파일 읽어옴');
+        templete.world._attributes.width = data.x_end - data.x_start;
+        templete.world._attributes.height = data.y_end - data.y_start;
         templete.world.BMPToTMX.tmxexportdir = {
             _attributes:{
                 path: 'tmxWorld'
@@ -52,41 +54,48 @@ module.exports = class toPZ{
         y-end: n
     }*/
 
-        if(!fs.existsSync(path.join(path.relative(this.mediaSrc, this.imgPath), '/.pzeditor'))){
+        if(!fs.existsSync(path.join(this.imgPath, '/.pzeditor'))){
             console.log('폴더 없음');
             fs.mkdirSync(path.join(this.imgPath, '/.pzeditor'));
         }
+        const imgTemplete = fs.readFileSync('../data/pzw/pngTemplete.dat').toString();
         for (let x = data.x_start; x < data.x_end - 1; x++) {
             for (let y = data.x_start; y < data.y_end - 1; y++) {
                 let root = path.join(path.relative(this.mediaSrc, this.imgPath), `/${x}_${y}.png`);
                 templete.world.bmp.push(
                     {_attributes:{
                         "path": root,
-                        "x": x,
-                        "y": y,
+                        "x": x-data.x_start,
+                        "y": y-data.y_start,
                         "width": "1",
                         "height": "1"
                         }
                     });
 
-                const rotateImage = () => {
-                    sharp(path.join(path.relative(this.mediaSrc, this.imgPath), `/${x}_${y}.png`))
+                /*const rotateImage = () => {
+                    sharp(path.join( this.imgPath, `/${x}_${y}.png`))
                         .rotate(45)
                         .toFile(path.join(this.imgPath, '/.pzeditor',`/${x}_${y}_png.png`))
-                }
-
-                rotateImage()
+                        .then(() => {
+                            sharp(path.join( this.imgPath, `/${x}_${y}.png`))
+                                .resize(300, 150)
+                                .toFile(path.join(this.imgPath, '/.pzeditor',`/${x}_${y}_png.png`))
+                        });
+                }*/
+                //rotateImage();
+                //fs.writeFileSync(path.join(this.imgPath, '/.pzeditor',`/${x}_${y}_png.dat`), imgTemplete);
             }
         }
-        fs.writeFileSync(path.join(this.mediaSrc, '/edited.pzw'),convert.json2xml(templete, {compact: true, spaces: 4}));
-        fs.writeFileSync(path.join(this.mediaSrc, '/edited.pzw.bak'),convert.json2xml(templete, {compact: true, spaces: 4}));
+        fs.writeFileSync(path.join(this.mediaSrc, `/${this.mapName}.pzw`),convert.json2xml(templete, {compact: true, spaces: 4}));
+        fs.writeFileSync(path.join(this.mediaSrc, `/${this.mapName}.pzw.bak`),convert.json2xml(templete, {compact: true, spaces: 4}));
+        console.log('파일 저장 완료');
     }
 
 }
-let pz = new (module.exports)('C:\\Users\\GurumNyang\\Documents\\Github\\PZ_seoul\\rendered', 'C:\\Users\\GurumNyang\\Documents\\Github\\PZ_seoul\\data', 'testMap1')
+let pz = new (module.exports)('C:\\Users\\GurumNyang\\Documents\\Github\\PZ_seoul\\rendered', 'C:\\Users\\GurumNyang\\Documents\\Github\\PZ_seoul\\export', 'testMap1')
 pz.initData({
-    x_start: 35,
-    x_end: 65,
-    y_start: 35,
-    y_end: 65
+    x_start: 0,
+    x_end: 128,
+    y_start: 0,
+    y_end: 95
 });
