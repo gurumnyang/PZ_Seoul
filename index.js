@@ -17,16 +17,18 @@ const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon, __dirn
 
 (async () => {
     await readOsm.init();
-    await readOsm.loadData();
+    await readOsm.loadMapData();
+    await readOsm.loadTRData();
     await readOsm.parseData();
-    // await readOsm.getArea();
-    await readOsm.loadArea();
-    await readOsm.areaToCell();
-    for(let x = 0; x < readOsm.lonCell; x++){
-        for(let y = 0; y < readOsm.latCell; y++){
-            await readOsm.generate(x, y);
-        }
-    }
-    // await readOsm.showCellData(26, 60);
-    // readOsm.genResidential();
+    await readOsm.parseRelation();
+    // // await readOsm.getArea();
+    // await readOsm.loadArea();
+    // await readOsm.areaToCell();
+    // for(let x = 0; x < readOsm.lonCell; x++){
+    //     for(let y = 0; y < readOsm.latCell; y++){
+    //         await readOsm.generate(x, y);
+    //     }
+    // }
+    // // await readOsm.showCellData(26, 60);
+    // // readOsm.genResidential();
 })();
