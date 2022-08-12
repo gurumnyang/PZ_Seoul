@@ -47,3 +47,15 @@ way.tags.highway type
 
 그 유튜브에 괜찮은 맵제작 영상있더라 보면서 공부하자
 https://www.youtube.com/watch?v=FNvTHgY__zg
+
+7 43 4 0 0
+0 0 4 43 7
+
+7 R E A A
+7 27 14 10 10
+AAER7
+
+32  4613
+카카오톡에 맵제작 관련 도와주시는 분이 오심.
+
+ctx.fill('evenodd'); inner type
