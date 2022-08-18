@@ -272,6 +272,7 @@ module.exports = class osmRead {
                 if(Math.floor(convert.toMeter('lat', config.lat[0] - item.lat ) / 300) < 0 || Math.floor(convert.toMeter('lon', item.lon - config.lon[0]) / 300) < 0) continue;
                 if(Math.floor(convert.toMeter('lat', config.lat[0] - item.lat ) / 300) >= this.cell.length || Math.floor(convert.toMeter('lon', item.lon - config.lon[0]) / 300) >= this.cell[0].length) continue;
                 (this.cell)[Math.floor(convert.toMeter('lat', config.lat[0] - item.lat ) / 300)][Math.floor(convert.toMeter('lon', item.lon - config.lon[0]) / 300)].push(item.id);
+
             }
             for(let idx of this.nodeList_TR){
                 let item = this.nodeHash[idx];
@@ -601,20 +602,26 @@ module.exports = class osmRead {
         if(srcRefs.length < 3){
             throw new Error('srcRefs node is less then 3');
         }
-        if(srcRefs[0].id !== srcRefs[srcRefs.length - 1].id){
+        if(JSON.stringify(srcRefs[0]) !== JSON.stringify(srcRefs[srcRefs.length - 1])){
             throw new Error('srcRefs refs is not closed');
         }
-
-        let poly = turf.polygon([srcRefs.map(node => [node.lat, node.lon])]);
+        if(srcRefs.length === 3){
+            return;
+        }
+        let poly = (!!srcRefs[0].id) ? turf.polygon([srcRefs.map(node => [node.lat, node.lon])]) : turf.polygon([srcRefs]);
 
         let cellList = [];
 
         //node에 따른 cell list 추가(초기 태스크가 됨)
         for(let nodeObj of srcRefs){
-            let cellCoord = [
+            let cellCoord =
+                (!!srcRefs[0].id) ? [
                 Math.floor(convert.toMeter('lat', config.lat[0] - nodeObj.lat ) / 300),
                 Math.floor(convert.toMeter('lon', nodeObj.lon - config.lon[0]) / 300)
-            ]
+            ] : [
+                    Math.floor(convert.toMeter('lat', config.lat[0] - nodeObj[0] ) / 300),
+                    Math.floor(convert.toMeter('lon', nodeObj[1] - config.lon[0]) / 300)
+                ]
             cellList.push([cellCoord[0], cellCoord[1]]);
         }
 
@@ -663,6 +670,8 @@ module.exports = class osmRead {
 
         //return cellData array;
     }
+
+
     showCellData(x, y){
         for(let obj of this.cell[y][x]){
             if(!this.nodeHash[obj].ways) continue;
@@ -689,13 +698,12 @@ module.exports = class osmRead {
                     if(
                         wayObj.tags.highway !== 'primary' &&
                         wayObj.tags.highway !== 'secondary' &&
-                        wayObj.tags.highway !== 'trunk' &&
-
-                        wayObj.tags.highway !== 'tertiary'&&
-                        wayObj.tags.highway !== 'primary_link'&&
-                        wayObj.tags.highway !== 'secondary_link'&&
-                        wayObj.tags.highway !== 'trunk_link'
+                        wayObj.tags.highway !== 'trunk'
                     ) continue;
+                    // wayObj.tags.highway !== 'tertiary'&&
+                    // wayObj.tags.highway !== 'primary_link'&&
+                    // wayObj.tags.highway !== 'secondary_link'&&
+                    // wayObj.tags.highway !== 'trunk_link'
                     const bridgeList = [
                         '가양대로',
                         '월드컵대교',
@@ -778,6 +786,7 @@ module.exports = class osmRead {
                 if(!this.areaCell[cellCoord[0]] || !this.areaCell[cellCoord[0]][cellCoord[1]]) continue;
                 this.areaCell[cellCoord[0]][cellCoord[1]].push(ftrIdx);
             }
+            this.objToCell(ftrIdx, item.geometry.coordinates[0], "areaCell");
         }
         //셀 셀안에 있는 그그ㅡ area 모으고
         //그다음이 도로 확인
@@ -827,6 +836,7 @@ module.exports = class osmRead {
         ctx3.antialias = 'none';
         ctx4.antialias = 'none';
         ctx5.antialias = 'none';
+        ctx5.lineCap = 'round';
 
 
         let coord = {
@@ -1070,7 +1080,7 @@ module.exports = class osmRead {
             //||route.tags.highway == 'residential'||route.tags.highway=='service'
             ctx5.beginPath();
             for(let pointIdx in route.refs){
-                ctx5.lineWidth = 2;
+                ctx5.lineWidth = 4;
                 ctx5.strokeStyle = '#646464';
                 /*switch(route.tags.highway){
                     //set rainbow color by highway type
