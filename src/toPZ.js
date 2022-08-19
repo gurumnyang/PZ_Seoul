@@ -59,8 +59,8 @@ module.exports = class toPZ{
             fs.mkdirSync(path.join(this.imgPath, '/.pzeditor'));
         }
         const imgTemplete = fs.readFileSync('../data/pzw/pngTemplete.dat').toString();
-        for (let x = data.x_start; x < data.x_end - 1; x++) {
-            for (let y = data.x_start; y < data.y_end - 1; y++) {
+        for (let x = data.x_start; x < data.x_end; x++) {
+            for (let y = data.x_start; y < data.y_end; y++) {
                 let root = path.join(path.relative(this.mediaSrc, this.imgPath), `/${x}_${y}.png`);
                 templete.world.bmp.push(
                     {_attributes:{
