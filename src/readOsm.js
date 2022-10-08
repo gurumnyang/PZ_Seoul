@@ -7,6 +7,8 @@ const fs = require('fs'),
     turf = require('turf'),
     parseOSM = require('osm-pbf-parser');
 
+
+
 const appRoot = process.cwd();
 
 // await readOsm.init();
@@ -109,6 +111,9 @@ module.exports = class osmRead {
                             case 'way':
                                 this.wayList.push(item.id);
                                 this.wayHash[item.id] = item;
+                                if(!item.tags.name){
+                                    console.log(item);
+                                }
                                 break;
                         }
                     });
@@ -118,6 +123,7 @@ module.exports = class osmRead {
                 this.nodeList.sort(function(a, b){return a-b});
                 this.STATE.LOAD_DATA = true;
                 this.osm = null;
+
                 resolve();
             });
         });
@@ -167,8 +173,8 @@ module.exports = class osmRead {
                     });
                     next();
                 })).on('finish', ()=>{
-                this.wayList.sort(function(a, b){return a-b});
-                this.nodeList.sort(function(a, b){return a-b});
+                this.wayList_TR.sort(function(a, b){return a-b});
+                this.nodeList_TR.sort(function(a, b){return a-b});
                 this.STATE.LOAD_RL_DATA = true;
                 resolve();
             });
@@ -196,6 +202,10 @@ module.exports = class osmRead {
                 if(roadFound){
                     this.wayHash[way_idx].roadData = roadFound;
                 } else {
+                    if(this.wayHash[way_idx].tags.highway == 'primary' || this.wayHash[way_idx].tags.highway == 'secondary' || this.wayHash[way_idx].tags.highway == 'tertiary'){
+                        console.log(this.wayHash[way_idx].tags.name);
+                    }
+                    
                     this.wayHash[way_idx].roadData = null;
                 }
             }
@@ -673,14 +683,47 @@ module.exports = class osmRead {
 
 
     showCellData(x, y){
-        for(let obj of this.cell[y][x]){
-            if(!this.nodeHash[obj].ways) continue;
+        /*let task = [
+            [1,-1],
+            [1,0],
+            [1,1],
+            [0,-1],
+            [0,0],
+            [0,1],
+            [-1,-1],
+            [-1,0],
+            [-1,1]
+        ];*/
+        let task = [[0, 0]]
+        // for(let obj of this.cell[y][x]){
+        //     if(!this.nodeHash[obj].ways) continue;
+        //
+        //     for(let way_index of this.nodeHash[obj].ways)
+        //     {
+        //         console.log(this.wayHash[way_index])
+        //     }
+        // }
 
-            for(let way_index of this.nodeHash[obj].ways)
-            {
-                console.log(this.wayHash[way_index])
+        let cellArr = [];
+        for(let i = 0; i <task.length; i++){
+            if(!this.areaCell[y + task[i][0]]) continue;
+            const cellObj = this.areaCell[y + task[i][0]][x + task[i][1]];
+            if(!cellObj) continue;
+            for(let obj_id of cellObj){
+                if(cellArr.includes(obj_id)) continue;
+                cellArr.push(obj_id);
             }
         }
+        cellArr = cellArr.map(id => this.GeoJSONArea.features[id]);
+
+        console.log(this.nodeHash[3739448754]);
+        for(let obj of cellArr){
+            /*if(!!obj.geometry.coordinates[0].find(coord => coord[0] == this.nodeHash[3739448754].lat && coord[1] == this.nodeHash[3739448754].lon)){
+                console.log(obj.geometry.coordinates[0]);
+            }*/
+            console.log(obj);
+        }
+
     }
     getArea(length){
         return new Promise((resolve) =>
@@ -698,12 +741,12 @@ module.exports = class osmRead {
                     if(
                         wayObj.tags.highway !== 'primary' &&
                         wayObj.tags.highway !== 'secondary' &&
-                        wayObj.tags.highway !== 'trunk'
+                        wayObj.tags.highway !== 'trunk' &&
+                        wayObj.tags.highway !== 'tertiary'&&
+                        wayObj.tags.highway !== 'primary_link'&&
+                        wayObj.tags.highway !== 'secondary_link'&&
+                        wayObj.tags.highway !== 'trunk_link'
                     ) continue;
-                    // wayObj.tags.highway !== 'tertiary'&&
-                    // wayObj.tags.highway !== 'primary_link'&&
-                    // wayObj.tags.highway !== 'secondary_link'&&
-                    // wayObj.tags.highway !== 'trunk_link'
                     const bridgeList = [
                         '가양대로',
                         '월드컵대교',
@@ -754,6 +797,10 @@ module.exports = class osmRead {
                 let time = new Date().getTime();
                 this.GeoJSONArea = turf.polygonize(this.GeoJSONWays);
                 console.log('처리 완료', new Date().getTime() - time, 'ms', this.GeoJSONArea.features.length+'개 확인됨');
+                for(let idx in this.GeoJSONArea.features){
+                    this.GeoJSONArea.features[idx].properties.color = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0').toUpperCase();
+
+                }
                 fs.writeFileSync(path.join(this.src,'/export/area.json'), JSON.stringify(this.GeoJSONArea));
                 this.STATE.GET_AREA = true;
                 resolve();
@@ -776,14 +823,16 @@ module.exports = class osmRead {
             throw new Error('Please Execute genCell()');
         }
         for(let ftrIdx in this.GeoJSONArea.features){
-            this.GeoJSONArea.features[ftrIdx].properties.color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
             let item = this.GeoJSONArea.features[ftrIdx];
             for(let coord of item.geometry.coordinates[0]){
                 let cellCoord = [
                     Math.floor(convert.toMeter('lat', config.lat[0] - coord[0] ) / 300),
                     Math.floor(convert.toMeter('lon', coord[1] - config.lon[0]) / 300)
                 ];
-                if(!this.areaCell[cellCoord[0]] || !this.areaCell[cellCoord[0]][cellCoord[1]]) continue;
+                if(!this.areaCell[cellCoord[0]]?.[cellCoord[1]]) {
+                    continue;
+                }
+                if(this.areaCell[cellCoord[0]][cellCoord[1]].includes(ftrIdx)) continue;
                 this.areaCell[cellCoord[0]][cellCoord[1]].push(ftrIdx);
             }
             this.objToCell(ftrIdx, item.geometry.coordinates[0], "areaCell");
@@ -920,7 +969,7 @@ module.exports = class osmRead {
             }
         }
         //for this.areaCell
-        for(let i = 0; i <task.length; i++){
+        for(let i = 0; i < task.length; i++){
             if(!this.areaCell[y + task[i][0]]) continue;
             const cellObj = this.areaCell[y + task[i][0]][x + task[i][1]];
             if(!cellObj) continue;
@@ -942,8 +991,10 @@ module.exports = class osmRead {
         //렌더링
         //area layer 4
         for(let route_id of cellArea){
+            if(cellArea.length > 1){
+            }
             let route = this.GeoJSONArea.features[route_id];
-            ctx4.fillStyle = route.properties.color
+            ctx4.fillStyle = route.properties.color;
             ctx4.beginPath();
             for(let pointIdx in route.geometry.coordinates[0]){
                 if(pointIdx === 0) {
@@ -968,6 +1019,14 @@ module.exports = class osmRead {
                 case 'wood':
                     ctx0.strokeStyle = '#75752f';
                     ctx0.fillStyle = '#75752f';
+                    break;
+                case 'grassland':
+                    ctx0.strokeStyle = '#91873c';
+                    ctx0.fillStyle = '#91873c';
+                    break;
+                case 'sand':
+                    ctx0.strokeStyle = '#d2c8a0';
+                    ctx0.fillStyle = '#d2c8a0';
                     break;
                 default:
                     console.log(rl.tags.natural);
@@ -1031,6 +1090,14 @@ module.exports = class osmRead {
                 case 'wood':
                     ctx0.strokeStyle = '#75752f';
                     ctx0.fillStyle = '#75752f';
+                    break;
+                case 'grassland':
+                    ctx0.strokeStyle = '#91873c';
+                    ctx0.fillStyle = '#91873c';
+                    break;
+                case 'sand':
+                    ctx0.strokeStyle = '#d2c8a0';
+                    ctx0.fillStyle = '#d2c8a0';
                     break;
                 default:
                     ctx0.strokeStyle = '#d2c8a0';
@@ -1103,15 +1170,28 @@ module.exports = class osmRead {
                         ctx1.strokeStyle = '#dd00ff';
                         break;
                 }*/
-                if(route.roadData){
+                if(route.tags.lanes){
+                    ctx5.lineWidth = Number(route.tags.lanes)*2;
+                    // ctx.lineWidth = 뭐시기
+                } else if(route.roadData){
+                    // ctx.strokeStyle = '#c86464';
                     if(!!roadType[route.roadData["siz_cde_nm2"]]){
-                        ctx5.lineWidth = roadType[route.roadData["siz_cde_nm2"]];
+                        if(route.tags.oneway === 'yes'){
+                            ctx5.lineWidth = roadType[route.roadData["siz_cde_nm2"]] / 2;
+                        } else {
+                            ctx5.lineWidth = roadType[route.roadData["siz_cde_nm2"]];
+                        }
                     } else {
                         console.log('roadType failed to load', route.roadData["siz_cde_nm2"]);
                     }
-                    // ctx.lineWidth = 뭐시기
-                } else {
-                    // ctx.strokeStyle = '#c86464';
+                }
+                switch(route.tags.highway){
+                    case 'primary':
+                        if(ctx5.lineWidth < 12) ctx5.lineWidth = 12;
+                        break;
+                    case 'secondary':
+                        if(ctx5.lineWidth < 10) ctx5.lineWidth = 10;
+                        break;
                 }
                 if(pointIdx === 0) {
                     ctx5.moveTo(Math.floor(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y)));
@@ -1137,8 +1217,6 @@ module.exports = class osmRead {
         return new Promise(resolve => {
             merge.createPNGStream().pipe(fs.createWriteStream(path.join(this.src,'/rendered/'+x+'_'+y+'.png'))
                 .on('finish', ()=>{
-
-                console.log('');
                 // console.log(coord);
                 // console.log('/rendered/'+x+'_'+y+'.png saved');
 
@@ -1155,9 +1233,21 @@ module.exports = class osmRead {
                     if(notFound.length> 0) console.log(notFound.length, '개의 Node를 찾을 수 없음.');
                     if(!this.average) this.average = (new Date() - start);
                     else this.average = ((this.average*49) + (new Date() - start))/50;
-                    console.clear();
 
-                    console.log(`[${x},${y}] rendered in ${(new Date() - start)}ms average: ${Math.floor(this.average*10)/10}ms`);
+                    if(!!this.send){
+                        this.send({
+                            key:'done',
+                            value:{
+                                x: x,
+                                y: y,
+                                average: this.average
+                            }
+                        });
+                    } else {
+                        console.clear();
+                        console.log(`[${x},${y}] rendered in ${(new Date() - start)}ms average: ${Math.floor(this.average*10)/10}ms`);
+                    }
+
                     resolve();
                 }));
             }));

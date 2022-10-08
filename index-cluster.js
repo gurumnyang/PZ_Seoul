@@ -104,8 +104,11 @@ if(cluster.isWorker)
         await readOsm.loadTRData();
         await readOsm.parseData();
         await readOsm.parseRelation();
-        await readOsm.getArea();
-        // await readOsm.loadArea();
+        if(process.argv[3] == '-ga'){
+            await readOsm.getArea();
+        } else {
+            await readOsm.loadArea();
+        }
         await readOsm.areaToCell();
 
         await client.set('lat', JSON.stringify(readOsm.lat));

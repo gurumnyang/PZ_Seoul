@@ -40,9 +40,6 @@ let lat = config.lat, // 위도 95.012152셀
     lon = config.lon //경도 128.048753셀
 
 
-/**
- * @todo clustering must be finished!!
- */
 
 class Init{
     constructor(lat, lon) {
@@ -115,9 +112,7 @@ class Init{
         });
     }
     waysCoord(isMaster, workerNumber, length){
-        /**
-         * @todo workerNumber이랑 length를 기반으로 range 만들어야 함
-         */
+
         this.setData();
         let n =(this.ways.length - (this.ways.length % length))/length;
         let newWays = [];
@@ -238,9 +233,6 @@ class Init{
         ctx.globalAlpha = 1;
 
 
-        /**
-         * @todo lineWidth Object .roadDATA USE
-         */
         for(let route of cellWays){
             ctx.beginPath();
             for(let pointIdx in route.refs){
