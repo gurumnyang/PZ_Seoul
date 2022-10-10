@@ -112,7 +112,6 @@ module.exports = class osmRead {
                                 this.wayList.push(item.id);
                                 this.wayHash[item.id] = item;
                                 if(!item.tags.name){
-                                    console.log(item);
                                 }
                                 break;
                         }
@@ -203,7 +202,7 @@ module.exports = class osmRead {
                     this.wayHash[way_idx].roadData = roadFound;
                 } else {
                     if(this.wayHash[way_idx].tags.highway == 'primary' || this.wayHash[way_idx].tags.highway == 'secondary' || this.wayHash[way_idx].tags.highway == 'tertiary'){
-                        console.log(this.wayHash[way_idx].tags.name);
+                        // console.log(this.wayHash[way_idx].tags.name);
                     }
                     
                     this.wayHash[way_idx].roadData = null;
@@ -1171,9 +1170,12 @@ module.exports = class osmRead {
                         break;
                 }*/
                 if(route.tags.lanes){
-                    ctx5.lineWidth = Number(route.tags.lanes)*2;
+                    ctx5.lineWidth = Number(route.tags.lanes)*2.75;
                     // ctx.lineWidth = 뭐시기
-                } else if(route.roadData){
+                }
+
+                //아래 내용은 현재 도로노선 API 정확도가 좆망한 관계로 사용하지 않음
+                /*else if(route.roadData){
                     // ctx.strokeStyle = '#c86464';
                     if(!!roadType[route.roadData["siz_cde_nm2"]]){
                         if(route.tags.oneway === 'yes'){
@@ -1184,15 +1186,18 @@ module.exports = class osmRead {
                     } else {
                         console.log('roadType failed to load', route.roadData["siz_cde_nm2"]);
                     }
-                }
+                }*/
+
+
                 switch(route.tags.highway){
                     case 'primary':
-                        if(ctx5.lineWidth < 12) ctx5.lineWidth = 12;
+                        if(ctx5.lineWidth < 11) ctx5.lineWidth = 11;
                         break;
                     case 'secondary':
                         if(ctx5.lineWidth < 10) ctx5.lineWidth = 10;
                         break;
                 }
+
                 if(pointIdx === 0) {
                     ctx5.moveTo(Math.floor(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y)));
                 }
@@ -1233,22 +1238,20 @@ module.exports = class osmRead {
                     if(notFound.length> 0) console.log(notFound.length, '개의 Node를 찾을 수 없음.');
                     if(!this.average) this.average = (new Date() - start);
                     else this.average = ((this.average*49) + (new Date() - start))/50;
-
-                    if(!!this.send){
-                        this.send({
-                            key:'done',
-                            value:{
-                                x: x,
-                                y: y,
-                                average: this.average
-                            }
-                        });
-                    } else {
-                        console.clear();
-                        console.log(`[${x},${y}] rendered in ${(new Date() - start)}ms average: ${Math.floor(this.average*10)/10}ms`);
-                    }
-
-                    resolve();
+                    (async ()=>{
+                        if(!!this.send){
+                            this.send({
+                                key:'done',
+                                value:{
+                                    average: this.average
+                                }
+                            });
+                        } else {
+                            console.clear();
+                            console.log(`[${x},${y}] rendered in ${(new Date() - start)}ms average: ${Math.floor(this.average*10)/10}ms`);
+                        }
+                        resolve();
+                    })();
                 }));
             }));
         });
