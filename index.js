@@ -26,12 +26,12 @@ const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon, __dirn
     await readOsm.areaToCell();
 
     let start = new Date();
-    await readOsm.showCellData(106, 48);
-    /*for(let x = 0; x < readOsm.lonCell; x++){
+    // await readOsm.showCellData(106, 48);
+    for(let x = 0; x < readOsm.lonCell; x++){
         for(let y = 0; y < readOsm.latCell; y++){
             await readOsm.generate(x, y);
         }
-    }*/
+    }
     console.log('총 소요 시간 : ', (new Date() - start)/1000 + '초');
     // // readOsm.genResidential();
 })();

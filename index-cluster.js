@@ -21,7 +21,7 @@ const
 const convert = require("./src/convert");
 const parseOSM = require("osm-pbf-parser");
 
-let worker_count = 8;
+let worker_count = 4;
 if(process.argv[2]) worker_count = Number(process.argv[2]);
 
 // 위도 37.6875428, 37.4307532 111km
@@ -141,8 +141,10 @@ if(cluster.isWorker)
         let average = null;
 
         let start = new Date();
+        let workerList = new Array(worker_count);
         for(let cpu = 0; cpu < worker_count; cpu++){
             let worker = cluster.fork();
+            workerList[worker.id-1] = [0, 0];
             worker.on('message', async (msg) => {
                 console.clear();
                 if(msg.key == 'done'){
@@ -157,7 +159,10 @@ if(cluster.isWorker)
                         } else {
                             average = msg.value.average;
                         }
-                        console.log(`진행중 : [${tile_count}/${tile_length}] ${average / worker_count}ms`);
+                        workerList[worker.id-1][0] = msg.value.average;
+                        workerList[worker.id-1][1]++
+                        console.log(workerList);
+                        console.log(`진행중 : [${tile_count}/${tile_length}]`);
                     }
                 }
             });
