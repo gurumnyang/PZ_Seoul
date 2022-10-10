@@ -1132,6 +1132,7 @@ module.exports = class osmRead {
         //road layer 5
         for(let route of cellWays){
             if(route.tags.highway === 'footway') continue;
+            if(route.tags.area === "yes") continue;
             if(
                 route.tags.highway !== 'primary' &&
                 route.tags.highway !== 'secondary' &&
