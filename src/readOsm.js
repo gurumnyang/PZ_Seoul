@@ -110,8 +110,6 @@ module.exports = class osmRead {
                             case 'way':
                                 this.wayList.push(item.id);
                                 this.wayHash[item.id] = item;
-                                if(!item.tags.name){
-                                }
                                 break;
                         }
                     });
@@ -121,7 +119,6 @@ module.exports = class osmRead {
                 this.nodeList.sort(function(a, b){return a-b});
                 this.STATE.LOAD_DATA = true;
                 this.osm = null;
-
                 resolve();
             });
         });
@@ -135,7 +132,6 @@ module.exports = class osmRead {
             this.osm = parseOSM();
 
             console.log('불러오는 중');
-            let i = 0;
 
             fs.createReadStream(config.terrainFileSrc)
                 .pipe(this.osm)
@@ -200,10 +196,6 @@ module.exports = class osmRead {
                 if(roadFound){
                     this.wayHash[way_idx].roadData = roadFound;
                 } else {
-                    if(this.wayHash[way_idx].tags.highway == 'primary' || this.wayHash[way_idx].tags.highway == 'secondary' || this.wayHash[way_idx].tags.highway == 'tertiary'){
-                        // console.log(this.wayHash[way_idx].tags.name);
-                    }
-                    
                     this.wayHash[way_idx].roadData = null;
                 }
             }
@@ -681,47 +673,14 @@ module.exports = class osmRead {
 
 
     showCellData(x, y){
-        /*let task = [
-            [1,-1],
-            [1,0],
-            [1,1],
-            [0,-1],
-            [0,0],
-            [0,1],
-            [-1,-1],
-            [-1,0],
-            [-1,1]
-        ];*/
-        let task = [[0, 0]]
-        // for(let obj of this.cell[y][x]){
-        //     if(!this.nodeHash[obj].ways) continue;
-        //
-        //     for(let way_index of this.nodeHash[obj].ways)
-        //     {
-        //         console.log(this.wayHash[way_index])
-        //     }
-        // }
+        for(let obj of this.cell[y][x]){
+            if(!this.nodeHash[obj].ways) continue;
 
-        let cellArr = [];
-        for(let i = 0; i <task.length; i++){
-            if(!this.areaCell[y + task[i][0]]) continue;
-            const cellObj = this.areaCell[y + task[i][0]][x + task[i][1]];
-            if(!cellObj) continue;
-            for(let obj_id of cellObj){
-                if(cellArr.includes(obj_id)) continue;
-                cellArr.push(obj_id);
+            for(let way_index of this.nodeHash[obj].ways)
+            {
+                console.log(this.wayHash[way_index])
             }
         }
-        cellArr = cellArr.map(id => this.GeoJSONArea.features[id]);
-
-        console.log(this.nodeHash[3739448754]);
-        for(let obj of cellArr){
-            /*if(!!obj.geometry.coordinates[0].find(coord => coord[0] == this.nodeHash[3739448754].lat && coord[1] == this.nodeHash[3739448754].lon)){
-                console.log(obj.geometry.coordinates[0]);
-            }*/
-            console.log(obj);
-        }
-
     }
     getArea(length){
         return new Promise((resolve) =>
@@ -731,7 +690,7 @@ module.exports = class osmRead {
                 }
                 let data = [];
                 let i = 0;
-                if(length == undefined) length = this.wayList.length;
+                if(length === undefined) length = this.wayList.length;
                 for(let wayObj of this.wayList){
                     if(i === length) break;
                     wayObj = this.wayHash[wayObj];
@@ -739,12 +698,12 @@ module.exports = class osmRead {
                     if(
                         wayObj.tags.highway !== 'primary' &&
                         wayObj.tags.highway !== 'secondary' &&
-                        wayObj.tags.highway !== 'trunk' &&
-                        wayObj.tags.highway !== 'tertiary'&&
-                        wayObj.tags.highway !== 'primary_link'&&
-                        wayObj.tags.highway !== 'secondary_link'&&
-                        wayObj.tags.highway !== 'trunk_link'
+                        wayObj.tags.highway !== 'trunk'
                     ) continue;
+                    // wayObj.tags.highway !== 'tertiary'&&
+                    // wayObj.tags.highway !== 'primary_link'&&
+                    // wayObj.tags.highway !== 'secondary_link'&&
+                    // wayObj.tags.highway !== 'trunk_link'
                     const bridgeList = [
                         '가양대로',
                         '월드컵대교',
@@ -821,6 +780,7 @@ module.exports = class osmRead {
             throw new Error('Please Execute genCell()');
         }
         for(let ftrIdx in this.GeoJSONArea.features){
+            this.GeoJSONArea.features[ftrIdx].properties.color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
             let item = this.GeoJSONArea.features[ftrIdx];
             for(let coord of item.geometry.coordinates[0]){
                 let cellCoord = [
@@ -931,7 +891,7 @@ module.exports = class osmRead {
                     for(let obj_1 of obj.ways){
                         const found = this.wayHash[obj_1];
                         if(found){
-                            if(!cellWays_id.find(e => (e == found.id))){
+                            if(!cellWays_id.find(e => (e === found.id))){
                                 cellWays.push(found);
                                 cellWays_id.push(found.id);
                             }
@@ -989,8 +949,6 @@ module.exports = class osmRead {
         //렌더링
         //area layer 4
         for(let route_id of cellArea){
-            if(cellArea.length > 1){
-            }
             let route = this.GeoJSONArea.features[route_id];
             ctx4.fillStyle = route.properties.color;
             ctx4.beginPath();
@@ -1222,6 +1180,8 @@ module.exports = class osmRead {
         return new Promise(resolve => {
             merge.createPNGStream().pipe(fs.createWriteStream(path.join(this.src,'/rendered/'+x+'_'+y+'.png'))
                 .on('finish', ()=>{
+
+                console.log('');
                 // console.log(coord);
                 // console.log('/rendered/'+x+'_'+y+'.png saved');
 

@@ -1,6 +1,4 @@
 const fs = require('fs');
-const progress = require('cli-progress');
-const readline = require("readline");
 const path = require('path');
 
 const appRoot = process.cwd();
@@ -18,10 +16,8 @@ let client = redis.createClient(6379,'127.0.0.1');
 const
     cluster = require('cluster'),
     os = require('os');
-const convert = require("./src/convert");
-const parseOSM = require("osm-pbf-parser");
 
-let worker_count = 4;
+let worker_count = Math.floor(os.cpus().length / 2);
 if(process.argv[2]) worker_count = Number(process.argv[2]);
 
 // 위도 37.6875428, 37.4307532 111km
@@ -104,7 +100,7 @@ if(cluster.isWorker)
         await readOsm.loadTRData();
         await readOsm.parseData();
         await readOsm.parseRelation();
-        if(process.argv[3] == '-ga'){
+        if(process.argv[3] === '-ga'){
             await readOsm.getArea();
         } else {
             await readOsm.loadArea();
@@ -141,15 +137,13 @@ if(cluster.isWorker)
         let average = null;
 
         let start = new Date();
-        let workerList = new Array(worker_count);
         for(let cpu = 0; cpu < worker_count; cpu++){
             let worker = cluster.fork();
-            workerList[worker.id-1] = [0, 0];
             worker.on('message', async (msg) => {
                 console.clear();
-                if(msg.key == 'done'){
+                if(msg.key === 'done'){
                     tile_count++;
-                    if(tile_count == tile_length){
+                    if(tile_count === tile_length){
                         console.log('전체 진행완료');
                         console.log('총 소요 시간 : ' + (new Date() - start)/1000 + '초');
                         process.exit();
