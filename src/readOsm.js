@@ -8,7 +8,6 @@ const fs = require('fs'),
     parseOSM = require('osm-pbf-parser');
 
 
-
 const appRoot = process.cwd();
 
 // await readOsm.init();
