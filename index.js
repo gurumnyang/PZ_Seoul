@@ -25,8 +25,9 @@ const readOsm = new (require('./src/readOsm.js'))(config.lat, config.lon, __dirn
     await readOsm.loadArea();
     await readOsm.areaToCell();
 
+
     let start = new Date();
-    // await readOsm.showCellData(106, 48);
+    // await readOsm.showCellData(81, 48);
     for(let x = 0; x < readOsm.lonCell; x++){
         for(let y = 0; y < readOsm.latCell; y++){
             await readOsm.generate(x, y);

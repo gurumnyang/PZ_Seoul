@@ -94,6 +94,7 @@ if(cluster.isWorker)
 {
     (async () => {
         console.log('worker_count:', worker_count);
+        let workerList = new Array(worker_count);
         await client.connect();
         await readOsm.init();
         await readOsm.loadMapData();
@@ -139,6 +140,7 @@ if(cluster.isWorker)
         let start = new Date();
         for(let cpu = 0; cpu < worker_count; cpu++){
             let worker = cluster.fork();
+            workerList[cpu] = [0, 0];
             worker.on('message', async (msg) => {
                 console.clear();
                 if(msg.key === 'done'){

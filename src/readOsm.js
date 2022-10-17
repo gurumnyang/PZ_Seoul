@@ -3,8 +3,9 @@ const fs = require('fs'),
     path = require('path'),
     GeoJSON = require('geojson'),
     convert = require('./convert.js'),
+    roadWidth = require('./roadWidth.js'),
     canvas = require("canvas"),
-    turf = require('turf'),
+    turf = require('@turf/turf'),
     parseOSM = require('osm-pbf-parser');
 
 
@@ -673,14 +674,23 @@ module.exports = class osmRead {
 
 
     showCellData(x, y){
-        for(let obj of this.cell[y][x]){
-            if(!this.nodeHash[obj].ways) continue;
-
-            for(let way_index of this.nodeHash[obj].ways)
-            {
-                console.log(this.wayHash[way_index])
+        let task = [
+            [0,0],
+        ];
+        let arr = [];
+        for(let i = 0; i < task.length; i++){
+            if(!this.areaCell[y + task[i][0]]) continue;
+            const cellObj = this.areaCell[y + task[i][0]][x + task[i][1]];
+            if(!cellObj) continue;
+            for(let obj_id of cellObj){
+                if(arr.includes(obj_id)) continue;
+                arr.push(obj_id);
             }
         }
+        arr.forEach(e => {
+            console.log(this.GeoJSONArea.features[e]);
+        });
+        console.log(arr);
     }
     getArea(length){
         return new Promise((resolve) =>
@@ -690,7 +700,7 @@ module.exports = class osmRead {
                 }
                 let data = [];
                 let i = 0;
-                if(length === undefined) length = this.wayList.length;
+                if(!!length) length = this.wayList.length;
                 for(let wayObj of this.wayList){
                     if(i === length) break;
                     wayObj = this.wayHash[wayObj];
@@ -698,12 +708,14 @@ module.exports = class osmRead {
                     if(
                         wayObj.tags.highway !== 'primary' &&
                         wayObj.tags.highway !== 'secondary' &&
-                        wayObj.tags.highway !== 'trunk'
+                        wayObj.tags.highway !== 'trunk' &&
+                        wayObj.tags.highway !== 'tertiary'&&
+                        wayObj.tags.highway !== 'primary_link'&&
+                        wayObj.tags.highway !== 'secondary_link'&&
+                        wayObj.tags.highway !== 'trunk_link'
                     ) continue;
-                    // wayObj.tags.highway !== 'tertiary'&&
-                    // wayObj.tags.highway !== 'primary_link'&&
-                    // wayObj.tags.highway !== 'secondary_link'&&
-                    // wayObj.tags.highway !== 'trunk_link'
+                    /*
+                    */
                     const bridgeList = [
                         '가양대로',
                         '월드컵대교',
@@ -749,14 +761,17 @@ module.exports = class osmRead {
                     i++
                 }
                 this.GeoJSONWays = GeoJSON.parse(data, {'LineString': 'coord'});
+
                 console.log('처리 시작', i+'개의 ways를 처리하는 중...');
                 console.log('보통 분 단위의 시간이 소요됩니다. 잠시만 기다려주세요.');
+
                 let time = new Date().getTime();
                 this.GeoJSONArea = turf.polygonize(this.GeoJSONWays);
-                console.log('처리 완료', new Date().getTime() - time, 'ms', this.GeoJSONArea.features.length+'개 확인됨');
-                for(let idx in this.GeoJSONArea.features){
-                    this.GeoJSONArea.features[idx].properties.color = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0').toUpperCase();
 
+                console.log('처리 완료', new Date().getTime() - time, 'ms', this.GeoJSONArea.features.length+'개 확인됨');
+
+                for(let idx in this.GeoJSONArea.features){
+                    this.GeoJSONArea.features[idx].properties.color = '#'+(~~(Math.random()*2**24)).toString(16).padStart(6,0);
                 }
                 fs.writeFileSync(path.join(this.src,'/export/area.json'), JSON.stringify(this.GeoJSONArea));
                 this.STATE.GET_AREA = true;
@@ -780,7 +795,7 @@ module.exports = class osmRead {
             throw new Error('Please Execute genCell()');
         }
         for(let ftrIdx in this.GeoJSONArea.features){
-            this.GeoJSONArea.features[ftrIdx].properties.color = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+            this.GeoJSONArea.features[ftrIdx].properties.color = '#'+(~~(Math.random()*2**24)).toString(16).padStart(6,0);
             let item = this.GeoJSONArea.features[ftrIdx];
             for(let coord of item.geometry.coordinates[0]){
                 let cellCoord = [
@@ -817,6 +832,7 @@ module.exports = class osmRead {
         layer3 TR_groundTR
         layer4 roadArea
         layer5 road
+        layer6 text
         ------
          */
         let start = new Date();
@@ -834,6 +850,8 @@ module.exports = class osmRead {
         let ctx4 = layer4.getContext('2d');
         let layer5 = canvas.createCanvas(300,300);
         let ctx5 = layer5.getContext('2d');
+        let layer6 = canvas.createCanvas(300,300);
+        let ctx6 = layer6.getContext('2d');
 
 
         ctxM.antialias = 'none';
@@ -844,6 +862,8 @@ module.exports = class osmRead {
         ctx4.antialias = 'none';
         ctx5.antialias = 'none';
         ctx5.lineCap = 'round';
+
+        ctx6.textAlign = 'center';
 
 
         let coord = {
@@ -947,9 +967,17 @@ module.exports = class osmRead {
 
 
         //렌더링
-        //area layer 4
+        //area layer 6
         for(let route_id of cellArea){
             let route = this.GeoJSONArea.features[route_id];
+            if(route.geometry.coordinates[0].length < 4) continue;
+
+            //area size
+            let polygon = turf.polygon(route.geometry.coordinates);
+            let linestring = turf.lineString(route.geometry.coordinates[0]);
+            let area = turf.area(polygon);
+            let feature = turf.pointOnFeature(polygon);
+
             ctx4.fillStyle = route.properties.color;
             ctx4.beginPath();
             for(let pointIdx in route.geometry.coordinates[0]){
@@ -961,6 +989,11 @@ module.exports = class osmRead {
             }
             ctx4.closePath();
             ctx4.fill();
+            ctx6.fillStyle = '#005000';
+            ctx6.font = "40px Arial";
+            ctx6.fillText(Math.floor(area), Math.floor(convert.toMeter('lon', feature.geometry.coordinates[1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-feature.geometry.coordinates[0]) - (300*y)));
+            ctx6.fillText(Math.floor(area / (turf.length(linestring) * 300)), Math.floor(convert.toMeter('lon', feature.geometry.coordinates[1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-feature.geometry.coordinates[0]) - (300*y))+40);
+
         }
 
         //terrain layer 0,1,2,3
@@ -1094,7 +1127,6 @@ module.exports = class osmRead {
                 route.tags.highway !== 'primary' &&
                 route.tags.highway !== 'secondary' &&
                 route.tags.highway !== 'trunk' &&
-
                 route.tags.highway !== 'tertiary' &&
                 route.tags.highway !== 'primary_link' &&
                 route.tags.highway !== 'secondary_link' &&
@@ -1130,6 +1162,10 @@ module.exports = class osmRead {
                 if(route.tags.lanes){
                     ctx5.lineWidth = Number(route.tags.lanes)*2.75;
                     // ctx.lineWidth = 뭐시기
+                } else if(route.tags.name){
+                    const width = roadWidth(route.tags.name);
+                    console.log(route.tags.name, width);
+                    if(width) ctx5.lineWidth = width;
                 }
 
                 //아래 내용은 현재 도로노선 API 정확도가 좆망한 관계로 사용하지 않음
@@ -1175,13 +1211,12 @@ module.exports = class osmRead {
         ctxM.drawImage(layer2, 0, 0);
         ctxM.drawImage(layer3, 0, 0)
         ctxM.drawImage(layer5, 0, 0);
+        ctxM.drawImage(layer6, 0, 0);
 
         if(!fs.existsSync(path.join(this.src,'/rendered/'))) fs.mkdirSync(path.join(this.src,'/rendered/'));
         return new Promise(resolve => {
             merge.createPNGStream().pipe(fs.createWriteStream(path.join(this.src,'/rendered/'+x+'_'+y+'.png'))
                 .on('finish', ()=>{
-
-                console.log('');
                 // console.log(coord);
                 // console.log('/rendered/'+x+'_'+y+'.png saved');
 
@@ -1207,7 +1242,7 @@ module.exports = class osmRead {
                                 }
                             });
                         } else {
-                            console.clear();
+                            // console.clear();
                             console.log(`[${x},${y}] rendered in ${(new Date() - start)}ms average: ${Math.floor(this.average*10)/10}ms`);
                         }
                         resolve();
