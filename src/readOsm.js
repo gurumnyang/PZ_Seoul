@@ -709,10 +709,10 @@ module.exports = class osmRead {
                         wayObj.tags.highway !== 'primary' &&
                         wayObj.tags.highway !== 'secondary' &&
                         wayObj.tags.highway !== 'trunk' &&
-                        wayObj.tags.highway !== 'tertiary'&&
+                        // wayObj.tags.highway !== 'tertiary'&&
                         wayObj.tags.highway !== 'primary_link'&&
-                        wayObj.tags.highway !== 'secondary_link'&&
-                        wayObj.tags.highway !== 'trunk_link'
+                        wayObj.tags.highway !== 'secondary_link'
+                        //&& wayObj.tags.highway !== 'trunk_link'
                     ) continue;
                     /*
                     */
@@ -831,6 +831,7 @@ module.exports = class osmRead {
         layer2 TR_water
         layer3 TR_groundTR
         layer4 roadArea
+        layer7 보도블럭
         layer5 road
         layer6 text
         ------
@@ -853,6 +854,10 @@ module.exports = class osmRead {
         let layer6 = canvas.createCanvas(300,300);
         let ctx6 = layer6.getContext('2d');
 
+        //보도블럭
+        let layer7 = canvas.createCanvas(300,300);
+        let ctx7 = layer7.getContext('2d');
+
 
         ctxM.antialias = 'none';
         ctx0.antialias = 'none';
@@ -862,6 +867,8 @@ module.exports = class osmRead {
         ctx4.antialias = 'none';
         ctx5.antialias = 'none';
         ctx5.lineCap = 'round';
+        ctx7.antialias = 'none';
+        ctx7.lineCap = 'round';
 
         ctx6.textAlign = 'center';
 
@@ -976,9 +983,15 @@ module.exports = class osmRead {
             let polygon = turf.polygon(route.geometry.coordinates);
             let linestring = turf.lineString(route.geometry.coordinates[0]);
             let area = turf.area(polygon);
+            let ratio = Math.floor(area / (turf.length(linestring) * 300));
             let feature = turf.pointOnFeature(polygon);
 
             ctx4.fillStyle = route.properties.color;
+
+
+
+
+
             ctx4.beginPath();
             for(let pointIdx in route.geometry.coordinates[0]){
                 if(pointIdx === 0) {
@@ -989,10 +1002,25 @@ module.exports = class osmRead {
             }
             ctx4.closePath();
             ctx4.fill();
+
+            if(area < 15000 && ratio < 50){
+                ctx5.fillStyle = '#646464';
+                ctx5.beginPath();
+                for(let pointIdx in route.geometry.coordinates[0]){
+                    if(pointIdx === 0) {
+                        ctx5.moveTo(Math.floor(convert.toMeter('lon', route.geometry.coordinates[0][pointIdx][1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.geometry.coordinates[0][pointIdx][0]) - (300*y)));
+                    } else {
+                        ctx5.lineTo(Math.floor(convert.toMeter('lon', route.geometry.coordinates[0][pointIdx][1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.geometry.coordinates[0][pointIdx][0]) - (300*y)));
+                    }
+                }
+                ctx5.closePath();
+                ctx5.fill();
+            }
+
             ctx6.fillStyle = '#005000';
             ctx6.font = "40px Arial";
             ctx6.fillText(Math.floor(area), Math.floor(convert.toMeter('lon', feature.geometry.coordinates[1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-feature.geometry.coordinates[0]) - (300*y)));
-            ctx6.fillText(Math.floor(area / (turf.length(linestring) * 300)), Math.floor(convert.toMeter('lon', feature.geometry.coordinates[1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-feature.geometry.coordinates[0]) - (300*y))+40);
+            ctx6.fillText(ratio, Math.floor(convert.toMeter('lon', feature.geometry.coordinates[1] - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-feature.geometry.coordinates[0]) - (300*y))+40);
 
         }
 
@@ -1119,7 +1147,7 @@ module.exports = class osmRead {
             ctx0.clearRect(0, 0, layer0.width, layer0.height);
         }
 
-        //road layer 5
+        //road layer 5, 7
         for(let route of cellWays){
             if(route.tags.highway === 'footway') continue;
             if(route.tags.area === "yes") continue;
@@ -1134,9 +1162,57 @@ module.exports = class osmRead {
                 route.tags.bridge !== 'yes'
             ) continue;
             //||route.tags.highway == 'residential'||route.tags.highway=='service'
+            ctx7.beginPath();
+            //보도블럭
+            for(let pointIdx in route.refs){
+                ctx7.lineWidth = 3;
+                ctx7.strokeStyle = '#963939';
+
+                if(route.tags.highway == 'trunk' || route.tags.highway == 'trunk_link'){
+                    if(route.tags.footway !== 'sidewalk' || route.tags.foot !== 'yes'){
+                        break;
+                    }
+                }
+
+                if(route.tags.layer >= 1){
+                    continue;
+                }
+                if(route.tags.foot == 'no'){
+                    continue;
+                }
+
+                switch(route.tags.highway){
+                    //width
+                    case 'primary':
+                        ctx7.lineWidth = (route.tags.oneway === 'yes' ) ? 8 : 16;
+                        ctx7.lineWidth = Math.round(ctx7.lineWidth + 10*2);
+                        break;
+                    case 'secondary':
+                        ctx7.lineWidth = (route.tags.oneway === 'yes' ) ? 5 : 10;
+                        ctx7.lineWidth = Math.round(ctx7.lineWidth + 8*2);
+                        break;
+                    case 'tertiary':
+                        ctx7.lineWidth = (route.tags.oneway === 'yes' ) ? 3 : 6;
+                        ctx7.lineWidth = Math.round(ctx7.lineWidth + 3*2);
+                        break;
+                    case 'trunk':
+                        ctx7.lineWidth = (route.tags.oneway === 'yes' ) ? 8 : 16;
+                        break;
+                }
+
+
+                if(pointIdx === 0) {
+                    ctx7.moveTo(Math.floor(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y)));
+                }
+                else {
+                    ctx7.lineTo(Math.floor(convert.toMeter('lon', route.refs[pointIdx].lon - this.lon[0]) - (300*x)), Math.floor(convert.toMeter('lat', this.lat[0]-route.refs[pointIdx].lat) - (300*y)));
+                }
+            };
+            ctx7.stroke();
+            //도로
             ctx5.beginPath();
             for(let pointIdx in route.refs){
-                ctx5.lineWidth = 4;
+                ctx5.lineWidth = 3;
                 ctx5.strokeStyle = '#646464';
                 /*switch(route.tags.highway){
                     //set rainbow color by highway type
@@ -1159,13 +1235,28 @@ module.exports = class osmRead {
                         ctx1.strokeStyle = '#dd00ff';
                         break;
                 }*/
+                switch(route.tags.highway){
+                    //width
+                    case 'primary':
+                        ctx5.lineWidth = (route.tags.oneway === 'yes' ) ? 8 : 16;
+                        break;
+                    case 'secondary':
+                        ctx5.lineWidth = (route.tags.oneway === 'yes' ) ? 5 : 10;
+                        break;
+                    case 'tertiary':
+                        ctx5.lineWidth = (route.tags.oneway === 'yes' ) ? 3 : 6;
+                        break;
+                    case 'trunk':
+                        ctx5.lineWidth = (route.tags.oneway === 'yes' ) ? 8 : 16;
+                        break;
+                }
                 if(route.tags.lanes){
-                    ctx5.lineWidth = Number(route.tags.lanes)*2.75;
+                    ctx5.lineWidth = Math.round(Number(route.tags.lanes)*3);
                     // ctx.lineWidth = 뭐시기
                 } else if(route.tags.name){
-                    const width = roadWidth(route.tags.name);
-                    console.log(route.tags.name, width);
-                    if(width) ctx5.lineWidth = width;
+                    // const width = roadWidth(route.tags.name);
+                    // console.log(route.tags.name, width);
+                    // if(width) ctx5.lineWidth = width;
                 }
 
                 //아래 내용은 현재 도로노선 API 정확도가 좆망한 관계로 사용하지 않음
@@ -1182,14 +1273,36 @@ module.exports = class osmRead {
                     }
                 }*/
 
-
-                switch(route.tags.highway){
-                    case 'primary':
-                        if(ctx5.lineWidth < 11) ctx5.lineWidth = 11;
-                        break;
-                    case 'secondary':
-                        if(ctx5.lineWidth < 10) ctx5.lineWidth = 10;
-                        break;
+                if(route.tags.oneway === 'yes'){
+                    switch(route.tags.highway){
+                        case 'primary':
+                            if(ctx5.lineWidth < 6) ctx5.lineWidth = 6;
+                            break;
+                        case 'secondary':
+                            if(ctx5.lineWidth < 4) ctx5.lineWidth = 4;
+                            break;
+                        case 'teritiary':
+                            if(ctx5.lineWidth < 3) ctx5.lineWidth = 3;
+                            break;
+                        case 'trunk':
+                            if(ctx5.lineWidth < 6) ctx5.lineWidth = 6;
+                            break;
+                    }
+                } else {
+                    switch(route.tags.highway){
+                        case 'primary':
+                            if(ctx5.lineWidth < 12) ctx5.lineWidth = 12;
+                            break;
+                        case 'secondary':
+                            if(ctx5.lineWidth < 8) ctx5.lineWidth = 8;
+                            break;
+                        case 'teritiary':
+                            if(ctx5.lineWidth < 6) ctx5.lineWidth = 6;
+                            break;
+                        case 'trunk':
+                            if(ctx5.lineWidth < 12) ctx5.lineWidth = 12;
+                            break;
+                    }
                 }
 
                 if(pointIdx === 0) {
@@ -1210,6 +1323,7 @@ module.exports = class osmRead {
         ctxM.drawImage(layer4, 0, 0);
         ctxM.drawImage(layer2, 0, 0);
         ctxM.drawImage(layer3, 0, 0)
+        ctxM.drawImage(layer7, 0, 0);
         ctxM.drawImage(layer5, 0, 0);
         ctxM.drawImage(layer6, 0, 0);
 
